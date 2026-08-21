@@ -1,0 +1,955 @@
+{
+  "meta": {
+    "file": "related-concepts.json",
+    "version": "0.1",
+    "updated": "2026-08-19",
+    "notice": "관련 개념은 IB가 고정한 목록이 아니라 교사가 정하는 것입니다. 이 파일은 선택을 돕는 후보 풀이며, 여기에 없는 개념도 자유롭게 쓸 수 있습니다.",
+    "usage": "byKeyConcept = 주요 개념에서 출발할 때, bySubject = 성취기준·교과에서 출발할 때. 두 축의 교집합을 우선 후보로 제시한다.",
+    "sources": [
+      "경기도교육청(2023). IB 이해하기 - PYP (주요 개념별 관련 개념 예시).",
+      "2022 개정 교육과정 초등학교 각 교과 교육과정(핵심 아이디어·내용 요소).",
+      "조의호(2022). IB PYP 사회과 교육과정의 특징과 시사점 고찰."
+    ]
+  },
+  "selectionGuide": {
+    "criteria": [
+      "주요 개념을 더 구체적인 맥락으로 좁혀 주는가?",
+      "성취기준의 내용 요소와 실제로 맞닿아 있는가?",
+      "중심 아이디어 문장에 자연스럽게 들어갈 수 있는가?",
+      "학년 수준에서 학생이 다룰 수 있는 말인가?"
+    ],
+    "countGuide": "UOI 하나에 2~5개 권장. 주요 개념 하나당 1~2개가 자연스럽다.",
+    "cautions": [
+      "관련 개념은 '개념'이어야 한다. 활동명(예: 벼룩시장 열기)이나 소재명(예: 배추흰나비)은 관련 개념이 아니다.",
+      "지나치게 추상적이면 주요 개념과 구별되지 않는다. 주요 개념보다 한 단계 구체적인 자리를 차지해야 한다.",
+      "성취기준에서 반복 등장하는 핵심 용어(예: 한살이, 인권, 비례)는 관련 개념 후보로 유력하다."
+    ]
+  },
+  "byKeyConcept": [
+    {
+      "keyConcept": "form",
+      "ko": "형태",
+      "seed": [
+        "성질",
+        "구조",
+        "유사점",
+        "차이점",
+        "패턴"
+      ],
+      "extended": [
+        "분류",
+        "특징",
+        "구성 요소",
+        "형식",
+        "규칙성",
+        "짜임",
+        "생김새",
+        "질서",
+        "유형"
+      ]
+    },
+    {
+      "keyConcept": "function",
+      "ko": "기능",
+      "seed": [
+        "행동",
+        "소통",
+        "패턴",
+        "역할",
+        "체제"
+      ],
+      "extended": [
+        "작용",
+        "쓰임",
+        "절차",
+        "방법",
+        "과정",
+        "기술",
+        "제도",
+        "운영",
+        "표현 방식"
+      ]
+    },
+    {
+      "keyConcept": "causation",
+      "ko": "인과 관계",
+      "seed": [
+        "결과",
+        "순서",
+        "패턴",
+        "영향"
+      ],
+      "extended": [
+        "원인",
+        "조건",
+        "요인",
+        "동기",
+        "결정",
+        "문제와 해결",
+        "상호작용",
+        "파급"
+      ]
+    },
+    {
+      "keyConcept": "change",
+      "ko": "변화",
+      "seed": [
+        "적응",
+        "성장",
+        "주기",
+        "순서",
+        "변형"
+      ],
+      "extended": [
+        "발달",
+        "순환",
+        "진화",
+        "혁신",
+        "전환",
+        "지속과 변화",
+        "역사적 변천",
+        "계절",
+        "성숙"
+      ]
+    },
+    {
+      "keyConcept": "connection",
+      "ko": "연결성",
+      "seed": [
+        "체제",
+        "관계",
+        "연결망",
+        "항상성",
+        "상호의존"
+      ],
+      "extended": [
+        "연계",
+        "교류",
+        "협력",
+        "생태계",
+        "공동체",
+        "순환 구조",
+        "네트워크",
+        "통합",
+        "균형"
+      ]
+    },
+    {
+      "keyConcept": "perspective",
+      "ko": "관점",
+      "seed": [
+        "주관성",
+        "진실",
+        "신념",
+        "의견",
+        "편견"
+      ],
+      "extended": [
+        "다양성",
+        "해석",
+        "가치관",
+        "입장",
+        "공감",
+        "문화 차이",
+        "비판",
+        "존중",
+        "정체성"
+      ]
+    },
+    {
+      "keyConcept": "responsibility",
+      "ko": "책임",
+      "seed": [
+        "권리",
+        "시민 의식",
+        "가치",
+        "정의",
+        "주도성"
+      ],
+      "extended": [
+        "의무",
+        "참여",
+        "실천",
+        "배려",
+        "지속가능성",
+        "공정",
+        "규범",
+        "선택",
+        "돌봄"
+      ]
+    }
+  ],
+  "bySubject": [
+    {
+      "subject": "통합교과",
+      "bands": [
+        "1~2학년군"
+      ],
+      "note": "바른 생활·슬기로운 생활·즐거운 생활. 초학문적 성격이 강해 UOI와 결합이 자연스럽다.",
+      "concepts": [
+        {
+          "name": "우리",
+          "keyConcepts": [
+            "connection",
+            "perspective"
+          ]
+        },
+        {
+          "name": "계절",
+          "keyConcepts": [
+            "change",
+            "form"
+          ]
+        },
+        {
+          "name": "이웃",
+          "keyConcepts": [
+            "connection",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "규칙",
+          "keyConcepts": [
+            "function",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "가족",
+          "keyConcepts": [
+            "connection",
+            "form"
+          ]
+        },
+        {
+          "name": "성장",
+          "keyConcepts": [
+            "change"
+          ]
+        },
+        {
+          "name": "놀이",
+          "keyConcepts": [
+            "function",
+            "connection"
+          ]
+        },
+        {
+          "name": "표현",
+          "keyConcepts": [
+            "function",
+            "perspective"
+          ]
+        },
+        {
+          "name": "안전",
+          "keyConcepts": [
+            "responsibility",
+            "causation"
+          ]
+        },
+        {
+          "name": "자연",
+          "keyConcepts": [
+            "form",
+            "connection"
+          ]
+        },
+        {
+          "name": "나라",
+          "keyConcepts": [
+            "form",
+            "connection"
+          ]
+        },
+        {
+          "name": "소중함",
+          "keyConcepts": [
+            "perspective",
+            "responsibility"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "국어",
+      "bands": [
+        "1~2학년군",
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "의사소통",
+          "keyConcepts": [
+            "function",
+            "connection"
+          ]
+        },
+        {
+          "name": "매체",
+          "keyConcepts": [
+            "function",
+            "change"
+          ]
+        },
+        {
+          "name": "설득",
+          "keyConcepts": [
+            "function",
+            "perspective"
+          ]
+        },
+        {
+          "name": "근거",
+          "keyConcepts": [
+            "causation",
+            "perspective"
+          ]
+        },
+        {
+          "name": "주제",
+          "keyConcepts": [
+            "form",
+            "perspective"
+          ]
+        },
+        {
+          "name": "구성",
+          "keyConcepts": [
+            "form"
+          ]
+        },
+        {
+          "name": "맥락",
+          "keyConcepts": [
+            "connection",
+            "perspective"
+          ]
+        },
+        {
+          "name": "듣기와 말하기",
+          "keyConcepts": [
+            "function",
+            "connection"
+          ]
+        },
+        {
+          "name": "정보",
+          "keyConcepts": [
+            "function",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "문학적 상상",
+          "keyConcepts": [
+            "perspective",
+            "form"
+          ]
+        },
+        {
+          "name": "공감",
+          "keyConcepts": [
+            "perspective",
+            "connection"
+          ]
+        },
+        {
+          "name": "정확성",
+          "keyConcepts": [
+            "form",
+            "responsibility"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "사회",
+      "bands": [
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "공동체",
+          "keyConcepts": [
+            "connection",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "인권",
+          "keyConcepts": [
+            "responsibility",
+            "perspective"
+          ]
+        },
+        {
+          "name": "민주주의",
+          "keyConcepts": [
+            "function",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "제도",
+          "keyConcepts": [
+            "function",
+            "form"
+          ]
+        },
+        {
+          "name": "지역",
+          "keyConcepts": [
+            "form",
+            "connection"
+          ]
+        },
+        {
+          "name": "문화 다양성",
+          "keyConcepts": [
+            "perspective",
+            "connection"
+          ]
+        },
+        {
+          "name": "자원",
+          "keyConcepts": [
+            "connection",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "경제활동",
+          "keyConcepts": [
+            "function",
+            "causation"
+          ]
+        },
+        {
+          "name": "역사적 변천",
+          "keyConcepts": [
+            "change",
+            "causation"
+          ]
+        },
+        {
+          "name": "자연환경과 인문환경",
+          "keyConcepts": [
+            "connection",
+            "causation"
+          ]
+        },
+        {
+          "name": "교류",
+          "keyConcepts": [
+            "connection",
+            "change"
+          ]
+        },
+        {
+          "name": "의사결정",
+          "keyConcepts": [
+            "function",
+            "perspective"
+          ]
+        },
+        {
+          "name": "갈등과 해결",
+          "keyConcepts": [
+            "causation",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "세계시민",
+          "keyConcepts": [
+            "responsibility",
+            "perspective"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "도덕",
+      "bands": [
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "존중",
+          "keyConcepts": [
+            "perspective",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "정의",
+          "keyConcepts": [
+            "responsibility",
+            "perspective"
+          ]
+        },
+        {
+          "name": "배려",
+          "keyConcepts": [
+            "responsibility",
+            "connection"
+          ]
+        },
+        {
+          "name": "자율",
+          "keyConcepts": [
+            "responsibility",
+            "function"
+          ]
+        },
+        {
+          "name": "생명 존중",
+          "keyConcepts": [
+            "responsibility",
+            "connection"
+          ]
+        },
+        {
+          "name": "공정",
+          "keyConcepts": [
+            "responsibility",
+            "perspective"
+          ]
+        },
+        {
+          "name": "성찰",
+          "keyConcepts": [
+            "perspective",
+            "change"
+          ]
+        },
+        {
+          "name": "관용",
+          "keyConcepts": [
+            "perspective"
+          ]
+        },
+        {
+          "name": "책임 있는 선택",
+          "keyConcepts": [
+            "responsibility",
+            "causation"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "수학",
+      "bands": [
+        "1~2학년군",
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "note": "수학은 UOI의 중심이 되기보다 탐구를 뒷받침하는 도구로 결합되는 경우가 많다.",
+      "concepts": [
+        {
+          "name": "규칙성",
+          "keyConcepts": [
+            "form",
+            "change"
+          ]
+        },
+        {
+          "name": "비례",
+          "keyConcepts": [
+            "connection",
+            "change"
+          ]
+        },
+        {
+          "name": "측정",
+          "keyConcepts": [
+            "form",
+            "function"
+          ]
+        },
+        {
+          "name": "자료와 표현",
+          "keyConcepts": [
+            "form",
+            "function"
+          ]
+        },
+        {
+          "name": "공간",
+          "keyConcepts": [
+            "form"
+          ]
+        },
+        {
+          "name": "변화율",
+          "keyConcepts": [
+            "change",
+            "causation"
+          ]
+        },
+        {
+          "name": "추론",
+          "keyConcepts": [
+            "causation",
+            "perspective"
+          ]
+        },
+        {
+          "name": "어림",
+          "keyConcepts": [
+            "function",
+            "perspective"
+          ]
+        },
+        {
+          "name": "분류",
+          "keyConcepts": [
+            "form"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "과학",
+      "bands": [
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "한살이",
+          "keyConcepts": [
+            "change",
+            "form"
+          ]
+        },
+        {
+          "name": "생태계",
+          "keyConcepts": [
+            "connection",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "에너지",
+          "keyConcepts": [
+            "function",
+            "change"
+          ]
+        },
+        {
+          "name": "물질의 상태",
+          "keyConcepts": [
+            "form",
+            "change"
+          ]
+        },
+        {
+          "name": "힘과 운동",
+          "keyConcepts": [
+            "causation",
+            "function"
+          ]
+        },
+        {
+          "name": "순환",
+          "keyConcepts": [
+            "change",
+            "connection"
+          ]
+        },
+        {
+          "name": "적응",
+          "keyConcepts": [
+            "change",
+            "connection"
+          ]
+        },
+        {
+          "name": "관찰과 증거",
+          "keyConcepts": [
+            "function",
+            "perspective"
+          ]
+        },
+        {
+          "name": "지구와 우주",
+          "keyConcepts": [
+            "form",
+            "change"
+          ]
+        },
+        {
+          "name": "환경 문제",
+          "keyConcepts": [
+            "causation",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "과학기술",
+          "keyConcepts": [
+            "function",
+            "change"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "실과",
+      "bands": [
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "생활 자원 관리",
+          "keyConcepts": [
+            "function",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "지속가능성",
+          "keyConcepts": [
+            "responsibility",
+            "connection"
+          ]
+        },
+        {
+          "name": "기술 시스템",
+          "keyConcepts": [
+            "function",
+            "connection"
+          ]
+        },
+        {
+          "name": "식생활",
+          "keyConcepts": [
+            "function",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "안전",
+          "keyConcepts": [
+            "responsibility",
+            "causation"
+          ]
+        },
+        {
+          "name": "발명과 혁신",
+          "keyConcepts": [
+            "change",
+            "function"
+          ]
+        },
+        {
+          "name": "디지털 도구",
+          "keyConcepts": [
+            "function",
+            "change"
+          ]
+        },
+        {
+          "name": "소비",
+          "keyConcepts": [
+            "responsibility",
+            "causation"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "체육",
+      "bands": [
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "건강",
+          "keyConcepts": [
+            "function",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "협력",
+          "keyConcepts": [
+            "connection",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "규칙과 전략",
+          "keyConcepts": [
+            "function",
+            "form"
+          ]
+        },
+        {
+          "name": "신체 표현",
+          "keyConcepts": [
+            "function",
+            "perspective"
+          ]
+        },
+        {
+          "name": "도전",
+          "keyConcepts": [
+            "change",
+            "responsibility"
+          ]
+        },
+        {
+          "name": "균형",
+          "keyConcepts": [
+            "form",
+            "connection"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "음악",
+      "bands": [
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "음악적 요소",
+          "keyConcepts": [
+            "form"
+          ]
+        },
+        {
+          "name": "표현 방식",
+          "keyConcepts": [
+            "function",
+            "perspective"
+          ]
+        },
+        {
+          "name": "문화적 맥락",
+          "keyConcepts": [
+            "connection",
+            "perspective"
+          ]
+        },
+        {
+          "name": "감상",
+          "keyConcepts": [
+            "perspective"
+          ]
+        },
+        {
+          "name": "소통으로서의 음악",
+          "keyConcepts": [
+            "function",
+            "connection"
+          ]
+        },
+        {
+          "name": "전통과 변화",
+          "keyConcepts": [
+            "change",
+            "connection"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "미술",
+      "bands": [
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "조형 요소",
+          "keyConcepts": [
+            "form"
+          ]
+        },
+        {
+          "name": "표현 의도",
+          "keyConcepts": [
+            "function",
+            "perspective"
+          ]
+        },
+        {
+          "name": "시대적 배경",
+          "keyConcepts": [
+            "connection",
+            "change"
+          ]
+        },
+        {
+          "name": "미적 관점",
+          "keyConcepts": [
+            "perspective"
+          ]
+        },
+        {
+          "name": "재료와 방법",
+          "keyConcepts": [
+            "function",
+            "form"
+          ]
+        },
+        {
+          "name": "시각적 소통",
+          "keyConcepts": [
+            "function",
+            "connection"
+          ]
+        }
+      ]
+    },
+    {
+      "subject": "영어",
+      "bands": [
+        "3~4학년군",
+        "5~6학년군"
+      ],
+      "concepts": [
+        {
+          "name": "의사소통 상황",
+          "keyConcepts": [
+            "function",
+            "connection"
+          ]
+        },
+        {
+          "name": "언어와 문화",
+          "keyConcepts": [
+            "connection",
+            "perspective"
+          ]
+        },
+        {
+          "name": "표현 형식",
+          "keyConcepts": [
+            "form",
+            "function"
+          ]
+        },
+        {
+          "name": "이해와 오해",
+          "keyConcepts": [
+            "causation",
+            "perspective"
+          ]
+        }
+      ]
+    }
+  ]
+}

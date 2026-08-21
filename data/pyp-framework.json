@@ -1,0 +1,531 @@
+{
+  "meta": {
+    "file": "pyp-framework.json",
+    "version": "0.1",
+    "updated": "2026-08-19",
+    "notice": "본 데이터는 IBO의 공식 승인을 받은 자료가 아니며, 아래 공개 문헌을 참고하여 재구성한 것입니다.",
+    "sources": [
+      "경기도교육청(2023). IB 이해하기 - PYP. 미래교육담당관.",
+      "조의호(2022). IB PYP 사회과 교육과정의 특징과 시사점 고찰. 사회과교육 61(1).",
+      "임유나(2022). IB PYP 학교 탐구 프로그램 분석 및 도입 양상 유형화.",
+      "김영민 외(2021). 국가 교육과정에 기반한 국제 바칼로레아(IB) 초등교육 프로그램(PYP) 현장 적용 방안 연구.",
+      "Marschall, C. & French, R.(2018). Concept-Based Inquiry in Action. 국역: 개념 기반 탐구학습의 실천(학지사).",
+      "Murdoch, K.(2015). The Power of Inquiry."
+    ]
+  },
+  "transdisciplinaryThemes": [
+    {
+      "id": "whoWeAre",
+      "ko": "우리는 누구인가",
+      "en": "Who We Are",
+      "descriptors": [
+        "자신의 성격, 신념과 가치에 대한 탐구",
+        "개인적·신체적·정신적·사회적·영적 건강",
+        "가족, 친구, 공동체, 문화를 포함한 인간관계",
+        "권리와 책임",
+        "인간이 된다는 것의 의미"
+      ]
+    },
+    {
+      "id": "whereWeAre",
+      "ko": "우리가 속한 공간과 시간",
+      "en": "Where We Are in Place and Time",
+      "descriptors": [
+        "시공간 속에서의 방향과 위치",
+        "개인의 역사, 가정과 여행",
+        "인류의 발견, 탐험, 이주",
+        "지역과 세계의 관점에서 본 개인과 문명의 관계"
+      ]
+    },
+    {
+      "id": "howWeExpress",
+      "ko": "우리 자신을 표현하는 방법",
+      "en": "How We Express Ourselves",
+      "descriptors": [
+        "아이디어, 감정, 자연, 문화, 신념, 가치를 발견하고 표현하는 방식",
+        "창의성을 성찰하고 확장하며 향유하는 방식",
+        "심미적 감상"
+      ]
+    },
+    {
+      "id": "howTheWorldWorks",
+      "ko": "세계가 돌아가는 방식",
+      "en": "How the World Works",
+      "descriptors": [
+        "자연계와 그 법칙",
+        "자연계(물리적·생물학적)와 인간 사회의 상호작용",
+        "인간이 과학적 원리에 대한 이해를 활용하는 방법",
+        "과학·기술의 진보가 사회와 환경에 미치는 영향"
+      ]
+    },
+    {
+      "id": "howWeOrganize",
+      "ko": "우리 자신을 조직하는 방식",
+      "en": "How We Organize Ourselves",
+      "descriptors": [
+        "인간이 만든 시스템과 공동체의 상호 연관성",
+        "조직의 구조와 기능",
+        "사회적 의사결정",
+        "경제 활동이 인류와 환경에 미치는 영향"
+      ]
+    },
+    {
+      "id": "sharingThePlanet",
+      "ko": "우리 모두의 지구",
+      "en": "Sharing the Planet",
+      "descriptors": [
+        "유한한 자원을 다른 사람·생물과 나누는 데서 오는 권리와 책임",
+        "공동체 안과 공동체 사이의 관계",
+        "균등한 기회에 대한 접근",
+        "평화와 갈등 해결"
+      ]
+    }
+  ],
+  "keyConcepts": [
+    {
+      "id": "form",
+      "ko": "형태",
+      "en": "Form",
+      "keyQuestion": "어떤 모습인가?",
+      "definition": "모든 것은 관찰·식별·설명이 가능하고 범주로 분류할 수 있는, 인식 가능한 특징(형태)을 가진다.",
+      "relatedConceptExamples": [
+        "성질",
+        "구조",
+        "유사점",
+        "차이점",
+        "패턴"
+      ]
+    },
+    {
+      "id": "function",
+      "ko": "기능",
+      "en": "Function",
+      "keyQuestion": "어떻게 작용하는가?",
+      "definition": "모든 것은 조사할 수 있는 목적, 역할, 행동 방식을 가진다.",
+      "relatedConceptExamples": [
+        "행동",
+        "소통",
+        "패턴",
+        "역할",
+        "체제"
+      ]
+    },
+    {
+      "id": "causation",
+      "ko": "인과 관계",
+      "en": "Causation",
+      "keyQuestion": "왜 그런가?",
+      "definition": "어떤 일도 이유 없이 일어나지 않으며, 모든 일에는 인과 관계가 있고 행동에는 결과가 따른다.",
+      "relatedConceptExamples": [
+        "결과",
+        "순서",
+        "패턴",
+        "영향"
+      ]
+    },
+    {
+      "id": "change",
+      "ko": "변화",
+      "en": "Change",
+      "keyQuestion": "어떻게 변하고 있는가?",
+      "definition": "변화는 한 상태에서 다른 상태로 이동하는 과정이며, 보편적이고 불가피하다.",
+      "relatedConceptExamples": [
+        "적응",
+        "성장",
+        "주기",
+        "순서",
+        "변형"
+      ]
+    },
+    {
+      "id": "connection",
+      "ko": "연결성",
+      "en": "Connection",
+      "keyQuestion": "다른 것과 어떻게 연결되어 있는가?",
+      "definition": "우리는 개별 요소의 행동이 다른 것에 영향을 미치는 상호작용 체계의 세계에 살고 있다.",
+      "relatedConceptExamples": [
+        "체제",
+        "관계",
+        "연결망",
+        "항상성",
+        "상호의존"
+      ]
+    },
+    {
+      "id": "perspective",
+      "ko": "관점",
+      "en": "Perspective",
+      "keyQuestion": "관점이란 무엇인가?",
+      "definition": "지식은 서로 다른 관점에 의해 중재되며, 관점에 따라 해석·이해·관찰 결과가 달라진다. 관점은 개인적·집단적·문화적·학문적일 수 있다.",
+      "relatedConceptExamples": [
+        "주관성",
+        "진실",
+        "신념",
+        "의견",
+        "편견"
+      ]
+    },
+    {
+      "id": "responsibility",
+      "ko": "책임",
+      "en": "Responsibility",
+      "keyQuestion": "우리의 의무는 무엇인가?",
+      "definition": "사람은 자신의 이해·신념·가치에 기반해 선택하고, 그 선택에 따른 실천으로 변화를 만들 수 있다.",
+      "relatedConceptExamples": [
+        "권리",
+        "시민 의식",
+        "가치",
+        "정의",
+        "주도성"
+      ]
+    }
+  ],
+  "learnerProfile": [
+    {
+      "id": "inquirers",
+      "ko": "탐구하는 사람",
+      "en": "Inquirers",
+      "draftDescription": "호기심을 가지고 스스로 질문하며 배우는 방법을 익혀 평생 학습을 즐긴다."
+    },
+    {
+      "id": "knowledgeable",
+      "ko": "지식이 풍부한 사람",
+      "en": "Knowledgeable",
+      "draftDescription": "여러 학문과 지역·세계의 중요한 문제에 걸쳐 깊이 있는 지식과 개념적 이해를 키운다."
+    },
+    {
+      "id": "thinkers",
+      "ko": "생각하는 사람",
+      "en": "Thinkers",
+      "draftDescription": "비판적·창의적으로 사고하여 복잡한 문제를 분석하고 책임 있는 결정을 내린다."
+    },
+    {
+      "id": "communicators",
+      "ko": "소통하는 사람",
+      "en": "Communicators",
+      "draftDescription": "여러 언어와 방법으로 자신 있게 표현하고, 다른 사람의 관점을 주의 깊게 듣는다."
+    },
+    {
+      "id": "principled",
+      "ko": "원칙을 지키는 사람",
+      "en": "Principled",
+      "draftDescription": "정직과 공정, 인간 존엄에 대한 존중을 바탕으로 행동하고 그 결과에 책임진다."
+    },
+    {
+      "id": "openMinded",
+      "ko": "열린 마음을 지닌 사람",
+      "en": "Open-minded",
+      "draftDescription": "자신의 문화와 역사를 소중히 여기는 동시에 타인의 가치와 전통을 존중하며 다양한 관점에서 배운다."
+    },
+    {
+      "id": "caring",
+      "ko": "배려하는 사람",
+      "en": "Caring",
+      "draftDescription": "공감과 연민, 존중의 태도로 타인의 삶과 주변 세계에 긍정적 변화를 만들고자 한다."
+    },
+    {
+      "id": "riskTakers",
+      "ko": "도전하는 사람",
+      "en": "Risk-takers",
+      "draftDescription": "불확실한 상황에 용기 있게 다가가며, 새로운 생각과 방법을 시도하고 변화 앞에서 회복력을 보인다."
+    },
+    {
+      "id": "balanced",
+      "ko": "균형 잡힌 사람",
+      "en": "Balanced",
+      "draftDescription": "지적·신체적·정서적 균형이 자신과 타인의 행복에 중요함을 이해하고 상호의존성을 인식한다."
+    },
+    {
+      "id": "reflective",
+      "ko": "성찰하는 사람",
+      "en": "Reflective",
+      "draftDescription": "자신의 학습과 경험, 강점과 약점을 깊이 돌아보며 성장을 위해 노력한다."
+    }
+  ],
+  "atl": [
+    {
+      "id": "thinking",
+      "ko": "사고 기능",
+      "clusters": [
+        "비판적 사고 기능",
+        "창의적 사고 기능",
+        "전이 기능(다양한 맥락에 적용)",
+        "성찰과 메타인지 기능"
+      ]
+    },
+    {
+      "id": "research",
+      "ko": "조사 기능",
+      "clusters": [
+        "정보 문해 기능",
+        "미디어 문해 기능",
+        "미디어와 정보의 윤리적 사용"
+      ]
+    },
+    {
+      "id": "communication",
+      "ko": "의사소통 기능",
+      "clusters": [
+        "정보 교환 기능",
+        "문해력",
+        "정보통신기술 활용"
+      ]
+    },
+    {
+      "id": "social",
+      "ko": "대인 관계 기능",
+      "clusters": [
+        "긍정적 대인관계와 협업 기능",
+        "사회정서적 지능"
+      ]
+    },
+    {
+      "id": "selfManagement",
+      "ko": "자기관리 기능",
+      "clusters": [
+        "관리 기능(시간과 과제의 효과적 관리)",
+        "마음가짐(끈기, 감정 조절, 자발적 동기부여, 회복탄력성 등)"
+      ]
+    }
+  ],
+  "actionTypes": [
+    {
+      "id": "participation",
+      "ko": "참여",
+      "en": "Participation",
+      "description": "개인이나 집단으로서 의견을 제시하고 동참하기"
+    },
+    {
+      "id": "advocacy",
+      "ko": "옹호 활동",
+      "en": "Advocacy",
+      "description": "사회적·환경적·정치적 변화를 지지하는 행동"
+    },
+    {
+      "id": "socialJustice",
+      "ko": "사회 정의",
+      "en": "Social Justice",
+      "description": "권리, 평등과 공정, 사회적 행복과 정의에 관한 행동"
+    },
+    {
+      "id": "socialEntrepreneurship",
+      "ko": "사회적 기업가 정신",
+      "en": "Social Entrepreneurship",
+      "description": "획기적이고 전략적이며 지속적인 사회 변화를 만드는 시도"
+    },
+    {
+      "id": "lifestyleChoices",
+      "ko": "생활 양식의 선택",
+      "en": "Lifestyle Choices",
+      "description": "소비 형태나 생활 습관의 변화로 실천하기"
+    }
+  ],
+  "inquiryModels": [
+    {
+      "id": "murdoch5",
+      "ko": "머독(Murdoch) 탐구 사이클",
+      "en": "Murdoch Inquiry Cycle",
+      "source": "Murdoch(2015)",
+      "stageCount": 5,
+      "note": "일반화 수렴 활동은 '범주화하기'와 '더 나아가기' 단계에 분산 배치한다.",
+      "stages": [
+        {
+          "id": "tuningIn",
+          "ko": "준비하기",
+          "en": "Tuning in",
+          "goals": [
+            "학생들의 사전 지식 활성화(이해도와 오개념 확인)",
+            "흥미와 태도 파악",
+            "시청각 자료와 도발적 질문으로 호기심 자극",
+            "학생들을 주제에 참여시키기"
+          ]
+        },
+        {
+          "id": "findingOut",
+          "ko": "찾아내기",
+          "en": "Finding out",
+          "goals": [
+            "새로운 정보를 계획적으로 조사·연구하고 생각을 논의·공유하도록 지원",
+            "기능과 지식을 사용해 새로운 정보 수집"
+          ]
+        },
+        {
+          "id": "sortingOut",
+          "ko": "범주화하기",
+          "en": "Sorting out",
+          "goals": [
+            "찾은 정보와 자료를 선별·정리(구성)하여 제시",
+            "의미 부여와 관련성 확인으로 패턴과 경향 발견",
+            "선호하는 학습 방법을 사용할 기회 제공"
+          ]
+        },
+        {
+          "id": "goingFurther",
+          "ko": "더 나아가기",
+          "en": "Going further",
+          "goals": [
+            "주제에 대한 또 다른 관점이나 차원 제시",
+            "개인적 관심 분야 탐색(조사)",
+            "관련 개념에 대한 깊은 이해를 위한 자유 탐구"
+          ]
+        },
+        {
+          "id": "reflectingActing",
+          "ko": "성찰 및 행동하기",
+          "en": "Reflecting and acting",
+          "goals": [
+            "자신의 아이디어를 적용하기",
+            "학습을 실제 상황과 연관 짓기",
+            "배운 개념을 바탕으로 실생활에서 행동 실천하기"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "marschallFrench7",
+      "ko": "마샬·프렌치(Marschall & French) 개념 기반 탐구",
+      "en": "Marschall & French Concept-Based Inquiry",
+      "source": "Marschall & French(2016/2018)",
+      "stageCount": 7,
+      "note": "성찰하기는 별도 단계이면서 전 과정에 스며든다. 단원 수준에서 일곱 단계 모두 포함(반복 가능, 누락 불가).",
+      "stages": [
+        {
+          "id": "engage",
+          "ko": "관계 맺기",
+          "en": "Engage",
+          "goals": [
+            "학습 주제에 관심 갖게 하기",
+            "사전 지식 끌어내고 평가하기",
+            "질문을 유도하고 초기 질문 모으기",
+            "학습의 목적과 범위 설정"
+          ]
+        },
+        {
+          "id": "focus",
+          "ko": "집중하기",
+          "en": "Focus",
+          "goals": [
+            "단원의 주요 개념과 관련 개념을 함께 이해하도록 하기",
+            "조사하기 단계에서 더 알아볼 사실적 예 소개"
+          ]
+        },
+        {
+          "id": "investigate",
+          "ko": "조사하기",
+          "en": "Investigate",
+          "goals": [
+            "사실적 예와 사례연구를 조사해 단원 개념과 연결하기",
+            "교과 내 또는 교과 간 기능 습득"
+          ]
+        },
+        {
+          "id": "organize",
+          "ko": "조직 및 정리하기",
+          "en": "Organize",
+          "goals": [
+            "다양한 자료·방법·교과로 개념과 생각 나타내기",
+            "사실적·개념적 수준에서 생각 구성하기"
+          ]
+        },
+        {
+          "id": "generalize",
+          "ko": "일반화하기",
+          "en": "Generalize",
+          "goals": [
+            "사실적 예시 안의 패턴과 연결성 발견",
+            "전이 가능한 개념적 이해를 명확히 하기"
+          ]
+        },
+        {
+          "id": "transfer",
+          "ko": "전이하기",
+          "en": "Transfer",
+          "goals": [
+            "새로운 상황에 일반화 적용하기",
+            "학습에 관한 의미 있는 행동 실천하기"
+          ]
+        },
+        {
+          "id": "reflect",
+          "ko": "성찰하기",
+          "en": "Reflect",
+          "goals": [
+            "탐구 과정 중과 마지막에 개별·그룹으로 평가하기",
+            "자신의 학습 과정을 계획하고 조절하도록 하기"
+          ]
+        }
+      ]
+    }
+  ],
+  "qualityCriteria": {
+    "concept": {
+      "label": "개념의 조건 (BATU)",
+      "items": [
+        {
+          "id": "broad",
+          "ko": "포괄적",
+          "check": "여러 교과(미술, 과학, 수학, 사회 등)에서도 발견되는가?"
+        },
+        {
+          "id": "abstract",
+          "ko": "추상적",
+          "check": "여러 사람이 그림으로 그린다면 서로 다르게 그릴 만큼 추상적인가?"
+        },
+        {
+          "id": "timeless",
+          "ko": "시대 초월",
+          "check": "100년 전에도, 100년 뒤에도 통하는가?"
+        },
+        {
+          "id": "universal",
+          "ko": "보편적",
+          "check": "다른 문화에서도 예시를 찾을 수 있는가?"
+        }
+      ]
+    },
+    "centralIdea": {
+      "label": "중심 아이디어의 조건 (ERCS)",
+      "items": [
+        {
+          "id": "engaging",
+          "ko": "흥미",
+          "check": "많은 학생에게 흥미로운가?"
+        },
+        {
+          "id": "relevant",
+          "ko": "연결",
+          "check": "이전에 배운 내용과 잘 연결되는가?"
+        },
+        {
+          "id": "challenging",
+          "ko": "도전",
+          "check": "기존 경험과 지식을 확장할 만큼 도전적인가?"
+        },
+        {
+          "id": "significant",
+          "ko": "중요",
+          "check": "초학문적 주제를 깊이 이해시킬 만큼 중요한가?"
+        }
+      ]
+    },
+    "centralIdeaForm": [
+      "한 문장으로 진술한다(개념들 간의 관계로).",
+      "현재 시제로 쓰고 고유명사를 넣지 않는다.",
+      "2022 개정 교육과정의 핵심 아이디어를 참고 자료로 활용할 수 있다."
+    ]
+  },
+  "designConstraints": {
+    "keyConceptsMax": 3,
+    "linesOfInquiryTypical": 3,
+    "requiredElements": [
+      "centralIdea",
+      "keyConcepts",
+      "relatedConcepts",
+      "linesOfInquiry"
+    ],
+    "requiredElementsNote": "IBO(2018)가 UOI에 반드시 담도록 한 최소 공통 항목. 그 외는 자유롭게 추가.",
+    "durationWeeksRecommended": "3~4주(길게는 6~10주)",
+    "uoisPerYearTypical": 6,
+    "loiConceptMapping": "탐구 목록과 주요 개념은 반드시 1:1이 아니며, 하나의 탐구 목록에 두 개 이상의 개념이 결합될 수 있다."
+  }
+}
