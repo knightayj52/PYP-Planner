@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PYP 탐구 단원 설계 도우미 v1.0</title>
+<meta name="description" content="국가 교육과정 성취기준과 연계해 IB PYP 탐구 단원(UOI)을 8단계로 설계하는 도구입니다.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
+<style>
+/* ============================================================
+   토큰
+   ============================================================ */
+:root{
+  --ink:#141A22;
+  --ink-2:#3B4756;
+  --ink-3:#6B7787;
+  --line:#DDE2E9;
+  --line-2:#EDF0F4;
+  --paper:#F4F6F8;
+  --surface:#FFFFFF;
+  --pine:#1F6F5C;
+  --pine-ink:#155448;
+  --pine-wash:#E6F2EE;
+  --alert:#A8412C;
+  --alert-wash:#FBEDE9;
+  --warn:#8A6410;
+  --warn-wash:#FBF3E0;
+
+  --radius:10px;
+  --radius-sm:6px;
+  --shadow:0 1px 2px rgba(20,26,34,.06), 0 8px 24px -12px rgba(20,26,34,.18);
+  --rail-w:236px;
+  --font-ui:"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Malgun Gothic", sans-serif;
+  --font-display:"Gowun Batang", "Nanum Myeongjo", serif;
+  --step:0ms;
+}
+html[data-theme="dark"]{
+  --ink:#E8ECF1;
+  --ink-2:#B4BECB;
+  --ink-3:#8592A2;
+  --line:#2C3644;
+  --line-2:#222B37;
+  --paper:#10151C;
+  --surface:#171E27;
+  --pine:#5FBFA6;
+  --pine-ink:#8FD9C4;
+  --pine-wash:#17322C;
+  --alert:#E08A75;
+  --alert-wash:#33211C;
+  --warn:#D6AE5C;
+  --warn-wash:#2E2717;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-ui);
+  font-size:15px;
+  line-height:1.65;
+  -webkit-text-size-adjust:100%;
+  word-break:keep-all;
+}
+h1,h2,h3{margin:0;font-weight:700;line-height:1.35}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--pine);outline-offset:2px;border-radius:4px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ============================================================
+   머리말
+   ============================================================ */
+.appbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:16px;
+  padding:12px 20px;
+  background:color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter:saturate(1.4) blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand__mark{
+  font-family:var(--font-display);
+  font-size:19px;font-weight:700;letter-spacing:-.01em;
+  white-space:nowrap;
+}
+.brand__ver{
+  font-size:11px;font-weight:600;letter-spacing:.06em;
+  color:var(--pine);
+  border:1px solid currentColor;border-radius:99px;
+  padding:1px 7px;
+}
+.brand__sub{
+  font-size:12.5px;color:var(--ink-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.appbar__tools{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:34px;padding:0 13px;
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font-size:13.5px;font-weight:600;
+  cursor:pointer;
+  transition:background .14s ease, border-color .14s ease, transform .14s ease;
+}
+.btn:hover{border-color:var(--ink-3)}
+.btn:active{transform:translateY(1px)}
+.btn--primary{
+  background:var(--pine);border-color:var(--pine);color:#fff;
+}
+html[data-theme="dark"] .btn--primary{color:#0C1512}
+.btn--primary:hover{background:var(--pine-ink);border-color:var(--pine-ink)}
+.btn--ghost{background:transparent;border-color:transparent;color:var(--ink-2)}
+.btn--ghost:hover{background:var(--line-2);border-color:transparent}
+.btn--lg{height:42px;padding:0 20px;font-size:14.5px}
+.btn[disabled]{opacity:.42;cursor:not-allowed}
+.btn[disabled]:active{transform:none}
+
+.keydot{
+  width:7px;height:7px;border-radius:99px;
+  background:var(--alert);flex:none;
+}
+.keydot[data-state="set"]{background:var(--pine)}
+
+/* ============================================================
+   레이아웃
+   ============================================================ */
+.shell{
+  display:grid;
+  grid-template-columns:var(--rail-w) minmax(0,1fr);
+  gap:32px;
+  max-width:1200px;
+  margin:0 auto;
+  padding:26px 20px 64px;
+}
+
+/* ---- 진행 레일: 이 앱의 중심 장치 ---- */
+.rail{position:sticky;top:78px;align-self:start}
+.rail__title{
+  font-size:11px;font-weight:700;letter-spacing:.12em;
+  color:var(--ink-3);margin-bottom:14px;
+  text-transform:none;
+}
+.rail__list{list-style:none;margin:0;padding:0;position:relative}
+.rail__list::before{
+  content:"";position:absolute;left:13px;top:14px;bottom:14px;
+  width:2px;background:var(--line);border-radius:2px;
+}
+.rail__fill{
+  position:absolute;left:13px;top:14px;width:2px;height:0;
+  background:var(--pine);border-radius:2px;
+  transition:height .32s cubic-bezier(.4,0,.2,1);
+}
+.rail__item{position:relative;z-index:1}
+.rail__btn{
+  display:flex;align-items:center;gap:11px;
+  width:100%;padding:5px 8px 5px 0;
+  background:none;border:0;border-radius:var(--radius-sm);
+  text-align:left;cursor:pointer;
+  color:var(--ink-3);
+  transition:color .14s ease;
+}
+.rail__btn:hover:not([disabled]){color:var(--ink)}
+.rail__btn[disabled]{cursor:not-allowed;opacity:.55}
+.rail__num{
+  flex:none;
+  width:28px;height:28px;border-radius:99px;
+  display:grid;place-items:center;
+  background:var(--surface);
+  border:2px solid var(--line);
+  font-size:12px;font-weight:700;
+  font-variant-numeric:tabular-nums;
+  transition:border-color .2s ease, background .2s ease, color .2s ease;
+}
+.rail__label{font-size:13.5px;font-weight:600;line-height:1.3}
+.rail__item[data-state="done"] .rail__num{
+  border-color:var(--pine);background:var(--pine-wash);color:var(--pine-ink);
+}
+.rail__item[data-state="done"] .rail__btn{color:var(--ink-2)}
+.rail__item[data-state="current"] .rail__num{
+  border-color:var(--pine);background:var(--pine);color:#fff;
+}
+html[data-theme="dark"] .rail__item[data-state="current"] .rail__num{color:#0C1512}
+.rail__item[data-state="current"] .rail__btn{color:var(--ink)}
+
+/* ---- 본문 ---- */
+.main{min-width:0}
+.step{display:none;animation:rise .26s cubic-bezier(.2,.7,.3,1) both}
+.step[data-active="true"]{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.step__head{margin-bottom:20px}
+.step__eyebrow{
+  display:flex;align-items:center;gap:8px;
+  font-size:11.5px;font-weight:700;letter-spacing:.1em;
+  color:var(--pine);margin-bottom:8px;
+  font-variant-numeric:tabular-nums;
+}
+.step__eyebrow::after{
+  content:"";flex:1;height:1px;background:var(--line);
+}
+.step__title{
+  font-family:var(--font-display);
+  font-size:27px;letter-spacing:-.02em;
+  margin-bottom:7px;
+}
+.step__hint{font-size:14px;color:var(--ink-2);max-width:60ch}
+
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:22px;
+  box-shadow:var(--shadow);
+}
+.card + .card{margin-top:16px}
+.card__title{font-size:15px;margin-bottom:6px}
+.card__body{font-size:14px;color:var(--ink-2)}
+
+.placeholder{
+  border:1px dashed var(--line);
+  border-radius:var(--radius);
+  background:var(--surface);
+  padding:34px 22px;
+  text-align:center;
+  color:var(--ink-3);
+  font-size:13.5px;
+}
+.placeholder strong{display:block;color:var(--ink-2);font-size:14.5px;margin-bottom:5px}
+
+.notice{
+  display:flex;gap:10px;
+  padding:12px 14px;border-radius:var(--radius-sm);
+  font-size:13.5px;line-height:1.55;
+  border:1px solid transparent;
+}
+.notice--info{background:var(--pine-wash);border-color:color-mix(in srgb,var(--pine) 30%,transparent);color:var(--pine-ink)}
+.notice--warn{background:var(--warn-wash);border-color:color-mix(in srgb,var(--warn) 34%,transparent);color:var(--warn)}
+.notice--stop{background:var(--alert-wash);border-color:color-mix(in srgb,var(--alert) 34%,transparent);color:var(--alert)}
+.notice + .notice{margin-top:10px}
+
+/* ---- 아래 이동 막대 ---- */
+.stepnav{
+  display:flex;align-items:center;gap:12px;
+  margin-top:26px;padding-top:18px;
+  border-top:1px solid var(--line);
+}
+.stepnav__status{
+  flex:1;min-width:0;
+  font-size:13px;color:var(--ink-3);
+}
+.stepnav__status[data-tone="stop"]{color:var(--alert);font-weight:600}
+
+/* ============================================================
+   대화 상자
+   ============================================================ */
+dialog{
+  width:min(520px, calc(100vw - 32px));
+  padding:0;border:1px solid var(--line);border-radius:12px;
+  background:var(--surface);color:var(--ink);
+  box-shadow:0 24px 60px -20px rgba(20,26,34,.5);
+}
+dialog::backdrop{background:rgba(20,26,34,.44);backdrop-filter:blur(2px)}
+.dlg__head{padding:20px 22px 0}
+.dlg__title{font-family:var(--font-display);font-size:19px;margin-bottom:6px}
+.dlg__desc{font-size:13.5px;color:var(--ink-2)}
+.dlg__body{padding:16px 22px}
+.dlg__foot{
+  display:flex;justify-content:flex-end;gap:8px;
+  padding:14px 22px 18px;
+}
+.field{display:block;margin-bottom:12px}
+.field__label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.field__input{
+  width:100%;height:40px;padding:0 12px;
+  background:var(--paper);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-size:14px;
+}
+.field__input:focus{outline:2px solid var(--pine);outline-offset:0;border-color:var(--pine)}
+.field__help{margin-top:6px;font-size:12.5px;color:var(--ink-3);line-height:1.5}
+.field__help a{color:var(--pine);text-underline-offset:2px}
+
+.vault{list-style:none;margin:0;padding:0;max-height:46vh;overflow:auto}
+.vault__empty{padding:26px 4px;text-align:center;color:var(--ink-3);font-size:13.5px}
+
+/* ============================================================
+   꼬리말
+   ============================================================ */
+.foot{
+  border-top:1px solid var(--line);
+  background:var(--surface);
+  padding:26px 20px 40px;
+}
+.foot__inner{max-width:1200px;margin:0 auto;font-size:12.5px;color:var(--ink-3);line-height:1.7}
+.foot__badge{
+  display:inline-block;margin-bottom:10px;
+  padding:3px 9px;border-radius:99px;
+  border:1px solid color-mix(in srgb,var(--alert) 40%,transparent);
+  background:var(--alert-wash);color:var(--alert);
+  font-size:12px;font-weight:700;
+}
+.foot details{margin-top:12px}
+.foot summary{cursor:pointer;font-weight:600;color:var(--ink-2);width:fit-content}
+.foot ul{margin:10px 0 0;padding-left:18px}
+.foot li{margin-bottom:4px}
+.foot a{color:var(--pine)}
+
+/* ============================================================
+   반응형
+   ============================================================ */
+@media (max-width: 900px){
+  .shell{grid-template-columns:1fr;gap:20px;padding:16px 14px 56px}
+  .rail{
+    position:sticky;top:59px;z-index:30;
+    margin:-16px -14px 0;padding:10px 14px;
+    background:color-mix(in srgb,var(--paper) 92%,transparent);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .rail__title{display:none}
+  .rail__list{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .rail__list::-webkit-scrollbar{display:none}
+  .rail__list::before,.rail__fill{display:none}
+  .rail__btn{
+    flex-direction:row;padding:4px 10px 4px 5px;
+    border:1px solid var(--line);background:var(--surface);
+    white-space:nowrap;
+  }
+  .rail__num{width:22px;height:22px;font-size:11px;border-width:1.5px}
+  .rail__label{font-size:12.5px}
+  .rail__item[data-state="current"] .rail__btn{border-color:var(--pine)}
+  .brand__sub{display:none}
+  .step__title{font-size:22px}
+  .appbar{padding:10px 14px;gap:10px}
+}
+@media (max-width: 560px){
+  .btn--label{display:none}
+  .btn{padding:0 10px}
+  .stepnav{flex-wrap:wrap}
+  .stepnav__status{order:3;flex-basis:100%}
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+@media print{
+  .appbar,.rail,.stepnav,.foot__badge{display:none}
+  .shell{display:block;padding:0}
+  .step{display:block !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ========== 머리말 ========== -->
+<header class="appbar">
+  <div class="brand">
+    <span class="brand__mark">PYP 탐구 단원 설계 도우미</span>
+    <span class="brand__ver">v1.0</span>
+    <span class="brand__sub">성취기준과 연계한 초학문적 탐구 단원(UOI) 설계</span>
+  </div>
+  <div class="appbar__tools">
+    <button class="btn" id="btn-key" type="button">
+      <span class="keydot" id="key-dot" data-state="unset" aria-hidden="true"></span>
+      <span class="btn--label">API 키</span>
+    </button>
+    <button class="btn" id="btn-vault" type="button"><span class="btn--label">보관함</span></button>
+    <button class="btn btn--ghost" id="btn-theme" type="button" aria-label="화면 밝기 바꾸기">
+      <span id="theme-icon" aria-hidden="true">☾</span>
+    </button>
+  </div>
+</header>
+
+<div class="shell">
+
+  <!-- ========== 진행 레일 ========== -->
+  <nav class="rail" aria-label="설계 단계">
+    <p class="rail__title">설계 진행</p>
+    <ol class="rail__list" id="rail-list">
+      <div class="rail__fill" id="rail-fill" aria-hidden="true"></div>
+      <li class="rail__item" data-step="1" data-state="current">
+        <button class="rail__btn" type="button" data-goto="1">
+          <span class="rail__num">1</span><span class="rail__label">주제 · 성취기준</span>
+        </button>
+      </li>
+      <li class="rail__item" data-step="2" data-state="locked">
+        <button class="rail__btn" type="button" data-goto="2" disabled>
+          <span class="rail__num">2</span><span class="rail__label">중심 아이디어</span>
+        </button>
+      </li>
+      <li class="rail__item" data-step="3" data-state="locked">
+        <button class="rail__btn" type="button" data-goto="3" disabled>
+          <span class="rail__num">3</span><span class="rail__label">개념</span>
+        </button>
+      </li>
+      <li class="rail__item" data-step="4" data-state="locked">
+        <button class="rail__btn" type="button" data-goto="4" disabled>
+          <span class="rail__num">4</span><span class="rail__label">탐구 목록</span>
+        </button>
+      </li>
+      <li class="rail__item" data-step="5" data-state="locked">
+        <button class="rail__btn" type="button" data-goto="5" disabled>
+          <span class="rail__num">5</span><span class="rail__label">질문</span>
+        </button>
+      </li>
+      <li class="rail__item" data-step="6" data-state="locked">
+        <button class="rail__btn" type="button" data-goto="6" disabled>
+          <span class="rail__num">6</span><span class="rail__label">평가</span>
+        </button>
+      </li>
+      <li class="rail__item" data-step="7" data-state="locked">
+        <button class="rail__btn" type="button" data-goto="7" disabled>
+          <span class="rail__num">7</span><span class="rail__label">탐구 과정</span>
+        </button>
+      </li>
+      <li class="rail__item" data-step="8" data-state="locked">
+        <button class="rail__btn" type="button" data-goto="8" disabled>
+          <span class="rail__num">8</span><span class="rail__label">검증 · 내보내기</span>
+        </button>
+      </li>
+    </ol>
+  </nav>
+
+  <!-- ========== 본문 ========== -->
+  <main class="main" id="main">
+
+    <section class="step" id="step-1" data-step="1" data-active="true" aria-labelledby="t1">
+      <div class="step__head">
+        <p class="step__eyebrow">단계 1 / 8</p>
+        <h1 class="step__title" id="t1">주제와 성취기준 고르기</h1>
+        <p class="step__hint">학년을 정하고 함께 다룰 교과를 2~4개 고른 뒤, 초학문적 주제를 하나 선택합니다. 고른 교과의 성취기준 가운데 주제와 맞닿는 것을 후보로 받아봅니다.</p>
+      </div>
+      <div class="placeholder"><strong>학년 · 교과 · 초학문적 주제 선택 화면</strong>다음 작업에서 채웁니다.</div>
+    </section>
+
+    <section class="step" id="step-2" data-step="2" aria-labelledby="t2">
+      <div class="step__head">
+        <p class="step__eyebrow">단계 2 / 8</p>
+        <h2 class="step__title" id="t2">중심 아이디어 쓰기</h2>
+        <p class="step__hint">2022 개정 교육과정의 핵심 아이디어를 먼저 확인하고, 그것을 근거로 삼은 중심 아이디어 후보 세 개를 받아 고릅니다. 고른 문장은 ERCS 기준으로 스스로 점검합니다.</p>
+      </div>
+      <div class="placeholder"><strong>핵심 아이디어 카드 · 중심 아이디어 후보 · 자가 점검</strong>다음 작업에서 채웁니다.</div>
+    </section>
+
+    <section class="step" id="step-3" data-step="3" aria-labelledby="t3">
+      <div class="step__head">
+        <p class="step__eyebrow">단계 3 / 8</p>
+        <h2 class="step__title" id="t3">개념 고르기</h2>
+        <p class="step__hint">주요 개념을 최대 세 개까지 고릅니다. 이어서 고른 교과와 개념이 겹치는 자리에서 관련 개념 후보가 바로 나옵니다.</p>
+      </div>
+      <div class="placeholder"><strong>주요 개념 7종 → 관련 개념 후보</strong>다음 작업에서 채웁니다.</div>
+    </section>
+
+    <section class="step" id="step-4" data-step="4" aria-labelledby="t4">
+      <div class="step__head">
+        <p class="step__eyebrow">단계 4 / 8</p>
+        <h2 class="step__title" id="t4">탐구 목록 쓰기</h2>
+        <p class="step__hint">중심 아이디어를 세 갈래로 나누어 탐구 목록을 씁니다. 각 목록에 주요 개념 태그를 붙이되, 한 목록에 두 개념이 함께 걸려도 괜찮습니다.</p>
+      </div>
+      <div class="placeholder"><strong>탐구 목록 3개 · 개념 태그</strong>다음 작업에서 채웁니다.</div>
+    </section>
+
+    <section class="step" id="step-5" data-step="5" aria-labelledby="t5">
+      <div class="step__head">
+        <p class="step__eyebrow">단계 5 / 8</p>
+        <h2 class="step__title" id="t5">질문 만들기</h2>
+        <p class="step__hint">탐구 목록마다 교사 발문을 마련하고, 학생이 던질 법한 질문을 미리 그려봅니다.</p>
+      </div>
+      <div class="placeholder"><strong>교사 발문 · 예상 학생 질문</strong>다음 작업에서 채웁니다.</div>
+    </section>
+
+    <section class="step" id="step-6" data-step="6" aria-labelledby="t6">
+      <div class="step__head">
+        <p class="step__eyebrow">단계 6 / 8</p>
+        <h2 class="step__title" id="t6">평가 짜기</h2>
+        <p class="step__hint">진단 · 형성 · 총괄 평가를 각각 마련하고 지식 · 이해 · 기능의 도달 기준을 씁니다. 총괄평가는 GRASPS 틀로 펼칠 수 있습니다.</p>
+      </div>
+      <div class="placeholder"><strong>평가 3종 · 도달 기준 · GRASPS 선택</strong>다음 작업에서 채웁니다.</div>
+    </section>
+
+    <section class="step" id="step-7" data-step="7" aria-labelledby="t7">
+      <div class="step__head">
+        <p class="step__eyebrow">단계 7 / 8</p>
+        <h2 class="step__title" id="t7">탐구 과정 배열하기</h2>
+        <p class="step__hint">탐구 모델을 하나 고르고 단계마다 활동을 배치합니다. 활동에 ATL 기능, 학습자상, 실행 유형을 함께 답니다.</p>
+      </div>
+      <div class="placeholder"><strong>탐구 모델 토글 · 단계별 활동</strong>다음 작업에서 채웁니다.</div>
+    </section>
+
+    <section class="step" id="step-8" data-step="8" aria-labelledby="t8">
+      <div class="step__head">
+        <p class="step__eyebrow">단계 8 / 8</p>
+        <h2 class="step__title" id="t8">점검하고 내보내기</h2>
+        <p class="step__hint">필수 항목이 빠지지 않았는지 확인하고, 연결되는 맥락을 덧붙인 뒤 워드 문서로 내려받습니다.</p>
+      </div>
+      <div class="placeholder"><strong>검증 게이트 · 연결 맥락 · 내보내기</strong>다음 작업에서 채웁니다.</div>
+    </section>
+
+    <!-- ========== 이동 막대 ========== -->
+    <div class="stepnav">
+      <button class="btn btn--lg" id="btn-prev" type="button" disabled>이전</button>
+      <button class="btn btn--lg btn--primary" id="btn-next" type="button">다음</button>
+      <p class="stepnav__status" id="stepnav-status">8단계 가운데 1단계입니다.</p>
+    </div>
+
+  </main>
+</div>
+
+<!-- ========== 꼬리말 ========== -->
+<footer class="foot">
+  <div class="foot__inner">
+    <span class="foot__badge">IBO 공인 도구가 아닙니다</span>
+    <p>이 도구는 국내 공개 자료를 바탕으로 재구성한 학교 현장용 설계 보조 도구입니다. IB 공식 문서를 옮겨 싣지 않았으며, IBO의 검토나 승인을 받지 않았습니다. 공식 기준은 학교의 IB 문서를 따라 주세요.</p>
+    <details>
+      <summary>참고한 자료</summary>
+      <ul>
+        <li>경기도교육청(2023). IB 이해하기 · PYP.</li>
+        <li>Murdoch, K. (2015). <em>The Power of Inquiry</em>.</li>
+        <li>Marschall, C., &amp; French, R. (2018). <em>Concept-Based Inquiry in Action</em>.</li>
+        <li>교육부(2022). 2022 개정 교육과정 총론 및 각론.</li>
+        <li>그 밖의 국내 학술 논문은 구조와 사실만 참고해 새로 썼습니다.</li>
+      </ul>
+    </details>
+    <p style="margin-top:12px">ⓒ 영쌤클래스 · CC BY-NC 4.0 · 입력한 내용과 API 키는 이 브라우저에만 저장되며 어디로도 전송되지 않습니다.</p>
+  </div>
+</footer>
+
+<!-- ========== 대화 상자 ========== -->
+<dialog id="dlg-key">
+  <div class="dlg__head">
+    <h2 class="dlg__title">API 키 등록</h2>
+    <p class="dlg__desc">Google AI Studio에서 발급한 Gemini API 키를 넣어 주세요. 키는 이 브라우저에만 저장됩니다.</p>
+  </div>
+  <div class="dlg__body">
+    <label class="field">
+      <span class="field__label">API 키</span>
+      <input class="field__input" id="key-input" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…">
+    </label>
+    <p class="field__help">
+      공용 컴퓨터에서는 사용을 마친 뒤 <strong>키 지우기</strong>를 눌러 주세요.
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">키 발급받기</a>
+    </p>
+    <p class="notice notice--info" id="key-msg" hidden></p>
+  </div>
+  <div class="dlg__foot">
+    <button class="btn btn--ghost" id="btn-key-clear" type="button">키 지우기</button>
+    <button class="btn" id="btn-key-cancel" type="button">닫기</button>
+    <button class="btn btn--primary" id="btn-key-save" type="button">저장하고 확인</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-vault">
+  <div class="dlg__head">
+    <h2 class="dlg__title">보관함</h2>
+    <p class="dlg__desc">이 브라우저에 저장한 설계안입니다.</p>
+  </div>
+  <div class="dlg__body">
+    <ul class="vault" id="vault-list"></ul>
+    <p class="vault__empty" id="vault-empty">아직 저장한 설계안이 없습니다. 단계를 진행하면 자동으로 임시 저장됩니다.</p>
+  </div>
+  <div class="dlg__foot">
+    <button class="btn" id="btn-vault-close" type="button">닫기</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-confirm">
+  <div class="dlg__head">
+    <h2 class="dlg__title" id="confirm-title">확인이 필요합니다</h2>
+    <p class="dlg__desc" id="confirm-desc"></p>
+  </div>
+  <div class="dlg__body">
+    <ul id="confirm-list" style="margin:0;padding-left:18px;font-size:13.5px;color:var(--ink-2);line-height:1.7"></ul>
+  </div>
+  <div class="dlg__foot">
+    <button class="btn" id="btn-confirm-back" type="button">돌아가서 고치기</button>
+    <button class="btn btn--primary" id="btn-confirm-go" type="button">이대로 진행</button>
+  </div>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
