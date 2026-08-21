@@ -39,6 +39,7 @@
 
     grade: null,                // 1
     subjects: [],
+    tonghapUnit: null,          // 1~2학년: { unit, area, bigIdea }
     theme: null,                // 초학문적 주제 id
     standards: [],
 
@@ -305,6 +306,433 @@
   }
 
   /* ============================================================
+   * 1단계 — 학년 · 단원/교과 · 초학문적 주제 · 성취기준
+   *   1~2학년 : 통합교과 단원이 중심, 국어·수학을 더할 수 있음
+   *   3~6학년 : 교과 2~4개를 골라 성취기준 풀을 합침
+   * ============================================================ */
+  var S1 = (function () {
+    var fw = null;        // pyp-framework.json
+    var pool = null;      // standards-e**.json
+    var units = null;     // tonghap.json 의 units
+
+    var TONGHAP_ONLY = ['바른 생활', '슬기로운 생활', '즐거운 생활'];
+    var CODE_SUBJECT = { '바': '바른 생활', '슬': '슬기로운 생활', '즐': '즐거운 생활' };
+    var AREA_THEME = {
+      '01': ['whoWeAre'],
+      '02': ['whereWeAre'],
+      '03': ['howTheWorldWorks', 'howWeOrganize'],
+      '04': ['howWeExpress']
+    };
+    var SUBJECT_MAX = 4;
+
+    /* ---- 작은 도우미 ---- */
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function bandFile(g) {
+      return g <= 2 ? 'standards-e12' : (g <= 4 ? 'standards-e34' : 'standards-e56');
+    }
+    function isTonghapName(n) { return TONGHAP_ONLY.indexOf(n) >= 0; }
+    function areaNo(a) { return String(a || '').slice(0, 2); }
+    function stripCode(t) { return String(t || '').replace(/^\[[^\]]+\]\s*/, ''); }
+    function extraSubjects() {
+      return (state.subjects || []).filter(function (n) { return !isTonghapName(n); });
+    }
+    function hasStd(code) {
+      return (state.standards || []).some(function (x) { return x.code === code; });
+    }
+    function addStd(o) { if (!hasStd(o.code)) state.standards.push(o); }
+    function dropStd(code) {
+      state.standards = (state.standards || []).filter(function (x) { return x.code !== code; });
+    }
+    function msg(text, tone) {
+      var el = $('#s1-msg');
+      if (!el) return;
+      if (!text) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = text;
+      el.className = 'notice notice--' + (tone || 'info');
+    }
+
+    /* ---- 성취기준 정규화 ---- */
+    function fromPool(raw) {
+      return {
+        code: raw.code,
+        subject: raw.subject,
+        domain: raw.domain,
+        text: stripCode(raw.text),
+        levels: raw.levels || null,
+        from: 'standards'
+      };
+    }
+    function fromUnit(raw, unitName) {
+      return {
+        code: raw.code,
+        subject: CODE_SUBJECT[String(raw.code).charAt(2)] || '통합교과',
+        domain: unitName,
+        text: stripCode(raw.statement),
+        levels: { A: raw.levelA, B: raw.levelB, C: raw.levelC },
+        from: 'tonghap'
+      };
+    }
+
+    /* ---- 데이터 ---- */
+    function ensure() {
+      var g = state.grade;
+      var jobs = [loadData('pyp-framework'), loadData(bandFile(g))];
+      if (g <= 2) jobs.push(loadData('tonghap'));
+      return Promise.all(jobs).then(function (r) {
+        fw = r[0];
+        pool = r[1];
+        if (g <= 2) units = (r[2] && r[2].units) || [];
+        return true;
+      });
+    }
+    function poolSubjects() {
+      var seen = {}, out = [];
+      ((pool && pool.standards) || []).forEach(function (s) {
+        if (isTonghapName(s.subject)) return;
+        if (!seen[s.subject]) { seen[s.subject] = 1; out.push(s.subject); }
+      });
+      return out;
+    }
+    function subjectStandards(name) {
+      return ((pool && pool.standards) || [])
+        .filter(function (s) { return s.subject === name; })
+        .map(fromPool);
+    }
+    function unitList(grade) {
+      return (units || []).filter(function (u) { return String(u.grade) === String(grade); });
+    }
+    function findUnit(name) {
+      var hit = null;
+      (units || []).forEach(function (u) { if (u.unit === name) hit = u; });
+      return hit;
+    }
+
+    /* ---- 그리기 ---- */
+    function paintGrades() {
+      var h = '';
+      for (var g = 1; g <= 6; g++) {
+        h += '<button class="chip" type="button" data-act="grade" data-v="' + g + '"' +
+             ' aria-pressed="' + (state.grade === g ? 'true' : 'false') + '">' + g + '학년</button>';
+      }
+      $('#s1-grades').innerHTML = h;
+    }
+
+    function paintScope() {
+      var box = $('#s1-scope');
+      if (!state.grade) { box.hidden = true; box.innerHTML = ''; return; }
+      box.hidden = false;
+      box.innerHTML = state.grade <= 2 ? scopeTonghap() : scopeSubjects();
+    }
+
+    function scopeTonghap() {
+      var list = unitList(state.grade);
+      var byArea = [], seen = {};
+      list.forEach(function (u) {
+        if (!seen[u.area]) { seen[u.area] = []; byArea.push(u.area); }
+        seen[u.area].push(u);
+      });
+
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>통합교과 단원 고르기</h3>' +
+              '<p class="block__hint">단원 하나가 바른 생활 · 슬기로운 생활 · 즐거운 생활 성취기준을 한 주제로 묶습니다. 단원을 고르면 그 세 가지가 자동으로 담깁니다.</p>';
+
+      byArea.forEach(function (area) {
+        h += '<p class="block__sub">' + esc(area) + '</p><div class="cards">';
+        seen[area].forEach(function (u) {
+          var on = state.tonghapUnit && state.tonghapUnit.unit === u.unit;
+          h += '<button class="pick" type="button" data-act="unit" data-v="' + esc(u.unit) + '"' +
+               ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
+               '<span class="pick__top"><span class="pick__name">' + esc(u.unit) + '</span>' +
+               (u.fix === '고정' ? '<span class="tag tag--fix">고정</span>' : '') +
+               '</span>' +
+               '<span class="pick__meta">' + esc(u.term) + '학기 · ' + esc(u.month) + '월</span>' +
+               '<span class="pick__idea">' + esc(String(u.bigIdea).replace(/^[0-9-]+\.\s*/, '')) + '</span>' +
+               '</button>';
+        });
+        h += '</div>';
+      });
+
+      var extras = extraSubjects();
+      h += '<p class="block__sub">교과 더하기 (고르지 않아도 됩니다)</p>' +
+           '<p class="block__hint" style="margin-left:0">단원과 함께 운영할 교과가 있으면 고르세요. 그 교과의 성취기준 목록이 아래에 함께 나타납니다.</p>' +
+           '<div class="chips">';
+      poolSubjects().forEach(function (name) {
+        h += '<button class="chip" type="button" data-act="subject" data-v="' + esc(name) + '"' +
+             ' aria-pressed="' + (extras.indexOf(name) >= 0 ? 'true' : 'false') + '">' + esc(name) + '</button>';
+      });
+      h += '</div>';
+      return h;
+    }
+
+    function scopeSubjects() {
+      var picked = state.subjects || [];
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>교과 고르기</h3>' +
+              '<p class="block__hint">초학문적 탐구이므로 교과를 2개에서 4개까지 함께 고릅니다. 지금 ' +
+              picked.length + '개를 골랐습니다.</p><div class="chips">';
+      poolSubjects().forEach(function (name) {
+        h += '<button class="chip" type="button" data-act="subject" data-v="' + esc(name) + '"' +
+             ' aria-pressed="' + (picked.indexOf(name) >= 0 ? 'true' : 'false') + '">' + esc(name) + '</button>';
+      });
+      return h + '</div>';
+    }
+
+    function paintThemes() {
+      var box = $('#s1-theme');
+      var ready = state.grade && (state.grade <= 2 ? !!state.tonghapUnit : (state.subjects || []).length > 0);
+      if (!ready || !fw) { box.hidden = true; box.innerHTML = ''; return; }
+      box.hidden = false;
+
+      var rec = [];
+      if (state.grade <= 2 && state.tonghapUnit) {
+        rec = AREA_THEME[areaNo(state.tonghapUnit.area)] || [];
+      }
+      var h = '<h3 class="block__title"><span class="block__ord">3</span>초학문적 주제 고르기</h3>' +
+              '<p class="block__hint">' +
+              (rec.length
+                ? '고르신 단원과 결이 가까운 주제에 추천 표시를 붙였습니다. 다른 주제를 고르셔도 됩니다.'
+                : '이 단원이 어떤 큰 물음 아래 놓이는지 정합니다.') +
+              '</p><div class="cards">';
+
+      (fw.transdisciplinaryThemes || []).forEach(function (t) {
+        var on = state.theme === t.id;
+        h += '<button class="pick" type="button" data-act="theme" data-v="' + esc(t.id) + '"' +
+             ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
+             '<span class="pick__top"><span class="pick__name">' + esc(t.ko) + '</span>' +
+             (rec.indexOf(t.id) >= 0 ? '<span class="tag tag--rec">추천</span>' : '') +
+             '</span><span class="pick__meta">' + esc(t.en) + '</span><ul class="pick__list">';
+        (t.descriptors || []).forEach(function (d) { h += '<li>' + esc(d) + '</li>'; });
+        return h += '</ul></button>';
+      });
+      box.innerHTML = h + '</div>';
+    }
+
+    function stdRow(o) {
+      return '<label class="std">' +
+             '<input type="checkbox" data-code="' + esc(o.code) + '"' + (hasStd(o.code) ? ' checked' : '') + '>' +
+             '<span class="std__code">' + esc(o.code) + '</span>' +
+             '<span class="std__text">' + esc(o.text) + '</span></label>';
+    }
+
+    function stdGroup(title, list, openIt) {
+      var byDom = [], seen = {};
+      list.forEach(function (o) {
+        if (!seen[o.domain]) { seen[o.domain] = []; byDom.push(o.domain); }
+        seen[o.domain].push(o);
+      });
+      var picked = list.filter(function (o) { return hasStd(o.code); }).length;
+      var h = '<details class="group" data-key="' + esc(title) + '"' + (openIt ? ' open' : '') +
+              '><summary>' + esc(title) +
+              '<span class="group__count">' + picked + ' / ' + list.length + '</span></summary>';
+      byDom.forEach(function (d) {
+        if (byDom.length > 1 || d !== title) h += '<p class="group__dom">' + esc(d) + '</p>';
+        seen[d].forEach(function (o) { h += stdRow(o); });
+      });
+      return h + '</details>';
+    }
+
+    var openKeys = null;   // 다시 그려도 펼친 교과가 접히지 않게 기억해 둔다
+
+    function rememberOpen() {
+      var box = $('#s1-std');
+      if (!box || box.hidden) return;
+      var found = [];
+      $$('.group[open]', box).forEach(function (d) {
+        var k = d.getAttribute('data-key');
+        if (k) found.push(k);
+      });
+      openKeys = found;
+    }
+
+    function paintStd() {
+      var box = $('#s1-std');
+      var ready = state.grade && (state.grade <= 2 ? !!state.tonghapUnit : (state.subjects || []).length > 0);
+      if (!ready) { box.hidden = true; box.innerHTML = ''; return; }
+      box.hidden = false;
+
+      var n = (state.standards || []).length;
+      var h = '<h3 class="block__title"><span class="block__ord">4</span>성취기준 고르기</h3>' +
+              '<p class="block__hint">이 단원에서 실제로 다룰 성취기준만 남겨 주세요. 나중 단계에서 중심 아이디어와 평가의 근거가 됩니다.</p>' +
+              '<div class="rowbtns">' +
+              '<button class="btn" type="button" data-act="ai">주제에 맞는 성취기준 추천받기</button>' +
+              '<span class="count">고른 성취기준 <strong>' + n + '</strong>개</span></div>' +
+              '<p class="notice notice--info" id="s1-msg" hidden></p>';
+
+      if (state.grade <= 2 && state.tonghapUnit) {
+        var u = findUnit(state.tonghapUnit.unit);
+        if (u) {
+          h += stdGroup('통합교과 · ' + u.unit,
+                        (u.standards || []).map(function (r) { return fromUnit(r, u.unit); }), true);
+        }
+      }
+      var subs = state.grade <= 2 ? extraSubjects() : (state.subjects || []);
+      subs.forEach(function (name) {
+        var list = subjectStandards(name);
+        if (list.length) h += stdGroup(name, list, subs.length <= 2);
+      });
+
+      box.innerHTML = h;
+      if (openKeys) {
+        $$('.group', box).forEach(function (d) {
+          d.open = openKeys.indexOf(d.getAttribute('data-key')) >= 0;
+        });
+      }
+    }
+
+    function paintAll() {
+      rememberOpen();
+      paintGrades(); paintScope(); paintThemes(); paintStd();
+      saveDraft();
+    }
+
+    /* ---- 조작 ---- */
+    function pickGrade(g) {
+      if (state.grade === g) return;
+      state.grade = g;
+      state.subjects = [];
+      state.tonghapUnit = null;
+      state.theme = null;
+      state.standards = [];
+      setStatus('성취기준을 불러오는 중입니다…');
+      ensure().then(function () {
+        setStatus('8단계 가운데 1단계입니다.');
+        paintAll();
+      })['catch'](function (e) {
+        setStatus('데이터를 불러오지 못했습니다. ' + e.message, 'stop');
+      });
+    }
+
+    function pickUnit(name) {
+      var u = findUnit(name);
+      if (!u) return;
+      // 단원을 바꾸면 이전 단원의 성취기준만 걷어내고 새 단원 것으로 채운다.
+      state.standards = (state.standards || []).filter(function (x) { return x.from !== 'tonghap'; });
+      state.tonghapUnit = { unit: u.unit, area: u.area, bigIdea: u.bigIdea };
+      (u.standards || []).forEach(function (r) { addStd(fromUnit(r, u.unit)); });
+      var keep = extraSubjects();
+      state.subjects = TONGHAP_ONLY.concat(keep);
+      openKeys = null;
+      paintAll();
+    }
+
+    function pickSubject(name) {
+      var list = (state.subjects || []).slice();
+      var at = list.indexOf(name);
+      if (at >= 0) {
+        list.splice(at, 1);
+        state.standards = (state.standards || []).filter(function (x) { return x.subject !== name; });
+      } else {
+        if (state.grade > 2 && list.length >= SUBJECT_MAX) {
+          setStatus('교과는 ' + SUBJECT_MAX + '개까지 고를 수 있습니다. 하나를 빼고 다시 골라 주세요.', 'stop');
+          return;
+        }
+        list.push(name);
+      }
+      state.subjects = list;
+      openKeys = null;
+      setStatus('8단계 가운데 1단계입니다.');
+      paintAll();
+    }
+
+    function pickTheme(id) {
+      state.theme = (state.theme === id) ? null : id;
+      paintAll();
+    }
+
+    function updateCounts() {
+      var box = $('#s1-std');
+      if (!box || box.hidden) return;
+      var total = $('.count strong', box);
+      if (total) total.textContent = (state.standards || []).length;
+      $$('.group', box).forEach(function (d) {
+        var all = $$('input[data-code]', d);
+        var on = all.filter(function (i) { return i.checked; }).length;
+        var lbl = $('.group__count', d);
+        if (lbl) lbl.textContent = on + ' / ' + all.length;
+      });
+      saveDraft();
+    }
+
+    function toggleStd(code, on) {
+      if (!on) { dropStd(code); updateCounts(); return; }
+      var found = null;
+      if (state.grade <= 2 && state.tonghapUnit) {
+        var u = findUnit(state.tonghapUnit.unit);
+        (u && u.standards || []).forEach(function (r) {
+          if (r.code === code) found = fromUnit(r, u.unit);
+        });
+      }
+      if (!found) {
+        ((pool && pool.standards) || []).forEach(function (r) {
+          if (r.code === code) found = fromPool(r);
+        });
+      }
+      if (found) addStd(found);
+      updateCounts();
+    }
+
+    function askAi() {
+      if (!state.theme) { msg('먼저 초학문적 주제를 골라 주세요.', 'warn'); return; }
+      msg('추천 기능은 다음 작업에서 연결합니다. 지금은 목록에서 직접 골라 주세요.', 'warn');
+    }
+
+    /* ---- 연결 ---- */
+    function bindStep1() {
+      var root = $('#step-1');
+      root.addEventListener('click', function (ev) {
+        var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+        if (!el || !root.contains(el)) return;
+        var v = el.getAttribute('data-v');
+        switch (el.getAttribute('data-act')) {
+          case 'grade': pickGrade(Number(v)); break;
+          case 'unit': pickUnit(v); break;
+          case 'subject': pickSubject(v); break;
+          case 'theme': pickTheme(v); break;
+          case 'ai': askAi(); break;
+        }
+      });
+      root.addEventListener('change', function (ev) {
+        var t = ev.target;
+        if (t && t.matches && t.matches('input[data-code]')) {
+          toggleStd(t.getAttribute('data-code'), t.checked);
+        }
+      });
+    }
+
+    /* ---- 검증 ---- */
+    registerGuard(1, function (st) {
+      var hard = [], soft = [];
+      if (!st.grade) hard.push('학년을 먼저 골라 주세요.');
+      else if (st.grade <= 2 && !st.tonghapUnit) hard.push('통합교과 단원을 골라 주세요.');
+      else if (st.grade > 2) {
+        var n = (st.subjects || []).length;
+        if (n < 2) hard.push('초학문적 탐구이므로 교과를 2개 이상 골라 주세요.');
+        else if (n > 4) hard.push('교과는 4개까지만 고를 수 있습니다.');
+      }
+      if (!st.theme) hard.push('초학문적 주제를 골라 주세요.');
+      if (!(st.standards || []).length) hard.push('성취기준을 하나 이상 골라 주세요.');
+
+      if (hard.length === 0 && (st.standards || []).length < 3) {
+        soft.push('성취기준이 ' + st.standards.length + '개입니다. 3~4주 단원이라면 조금 적을 수 있습니다.');
+      }
+      return { hard: hard, soft: soft };
+    });
+
+    function init() {
+      paintGrades();
+      bindStep1();
+      if (state.grade) {
+        ensure().then(paintAll)['catch'](function () { /* 데이터 없으면 학년 화면만 */ });
+      }
+    }
+
+    return { init: init, repaint: paintAll };
+  })();
+
+  /* ============================================================
    * 테마
    * ============================================================ */
   function applyTheme(mode) {
@@ -369,6 +797,7 @@
     bind();
     paintKeyState();
     renderStep();
+    S1.init();
   }
 
   if (document.readyState === 'loading') {

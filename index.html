@@ -320,6 +320,99 @@ dialog::backdrop{background:rgba(20,26,34,.44);backdrop-filter:blur(2px)}
 .foot a{color:var(--pine)}
 
 /* ============================================================
+   1단계 고르기 화면
+   ============================================================ */
+.block + .block{margin-top:22px;padding-top:20px;border-top:1px solid var(--line-2)}
+.block__title{display:flex;align-items:center;gap:9px;font-size:16.5px;margin-bottom:5px}
+.block__ord{
+  flex:none;width:23px;height:23px;border-radius:7px;
+  display:grid;place-items:center;
+  background:var(--pine-wash);color:var(--pine-ink);
+  font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;
+}
+.block__hint{font-size:14px;color:var(--ink-3);margin:0 0 13px 32px}
+.block__sub{
+  font-size:12.5px;font-weight:700;letter-spacing:.04em;
+  color:var(--ink-3);margin:16px 0 8px;
+}
+.block__sub:first-of-type{margin-top:0}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  height:36px;padding:0 15px;
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:99px;
+  font-size:14.5px;font-weight:600;cursor:pointer;
+  transition:background .14s ease,border-color .14s ease,color .14s ease;
+}
+.chip:hover{border-color:var(--ink-3)}
+.chip[aria-pressed="true"]{background:var(--pine);border-color:var(--pine);color:#fff}
+html[data-theme="dark"] .chip[aria-pressed="true"]{color:#0C1512}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(252px,1fr));gap:10px}
+.pick{
+  display:block;width:100%;text-align:left;
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:13px 15px;cursor:pointer;
+  transition:border-color .14s ease,background .14s ease;
+}
+.pick:hover{border-color:var(--ink-3)}
+.pick[aria-pressed="true"]{
+  border-color:var(--pine);background:var(--pine-wash);
+  box-shadow:inset 0 0 0 1px var(--pine);
+}
+.pick__top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px}
+.pick__name{font-size:15.5px;font-weight:700}
+.pick__meta{font-size:13px;color:var(--ink-3)}
+.pick__idea{font-size:13.5px;color:var(--ink-2);margin-top:5px;line-height:1.5}
+.pick__list{margin:7px 0 0;padding-left:17px;font-size:13.5px;color:var(--ink-2);line-height:1.55}
+.pick__list li{margin-bottom:2px}
+
+.tag{
+  font-size:11.5px;font-weight:700;line-height:1.6;
+  padding:0 7px;border-radius:99px;border:1px solid currentColor;
+}
+.tag--rec{color:var(--pine)}
+.tag--fix{color:var(--warn)}
+
+.group{
+  border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--surface);margin-bottom:8px;overflow:hidden;
+}
+.group > summary{
+  display:flex;align-items:center;gap:9px;
+  padding:11px 15px;cursor:pointer;
+  font-size:15px;font-weight:700;
+  list-style:none;
+}
+.group > summary::-webkit-details-marker{display:none}
+.group > summary::before{content:"▸";color:var(--ink-3);font-size:12px}
+.group[open] > summary::before{content:"▾"}
+.group__count{margin-left:auto;font-size:13px;font-weight:600;color:var(--ink-3)}
+.group__dom{
+  padding:9px 15px 3px;
+  font-size:12.5px;font-weight:700;color:var(--ink-3);
+  border-top:1px solid var(--line-2);
+}
+.std{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:8px 15px 8px 15px;cursor:pointer;
+  font-size:14.5px;
+}
+.std:hover{background:var(--line-2)}
+.std input{flex:none;width:16px;height:16px;margin:4px 0 0;accent-color:var(--pine)}
+.std__code{
+  flex:none;font-size:13px;font-weight:700;color:var(--pine-ink);
+  font-variant-numeric:tabular-nums;
+}
+.std__text{color:var(--ink-2);line-height:1.5}
+
+.rowbtns{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:13px}
+.count{font-size:14px;color:var(--ink-3);font-weight:600}
+.count strong{color:var(--pine-ink)}
+
+/* ============================================================
    반응형
    ============================================================ */
 @media (max-width: 900px){
@@ -443,7 +536,14 @@ dialog::backdrop{background:rgba(20,26,34,.44);backdrop-filter:blur(2px)}
         <h1 class="step__title" id="t1">주제와 성취기준 고르기</h1>
         <p class="step__hint">학년을 정하고 함께 다룰 교과를 2~4개 고른 뒤, 초학문적 주제를 하나 선택합니다. 고른 교과의 성취기준 가운데 주제와 맞닿는 것을 후보로 받아봅니다.</p>
       </div>
-      <div class="placeholder"><strong>학년 · 교과 · 초학문적 주제 선택 화면</strong>다음 작업에서 채웁니다.</div>
+      <div class="block">
+        <h3 class="block__title"><span class="block__ord">1</span>학년 고르기</h3>
+        <p class="block__hint">학년을 고르면 그 학년군의 성취기준을 불러옵니다.</p>
+        <div class="chips" id="s1-grades"></div>
+      </div>
+      <div class="block" id="s1-scope" hidden></div>
+      <div class="block" id="s1-theme" hidden></div>
+      <div class="block" id="s1-std" hidden></div>
     </section>
 
     <section class="step" id="step-2" data-step="2" aria-labelledby="t2">
