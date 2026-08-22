@@ -1963,6 +1963,21 @@
     // → 개념끼리의 관계를 묻고(개념) → 근거를 들어 견준다(논쟁).
     var TYPES = ['사실', '형성', '개념', '논쟁'];
 
+    // 개념 형성 질문의 다섯 갈래. 초등에서 실제로 통하는 것만 추렸다.
+    // 화면 안내와 프롬프트가 같은 목록을 쓰도록 한 곳에 둔다.
+    var FORMING = [
+      { ko: '공통점 찾기', why: '사례를 나란히 놓고 무엇이 되풀이되는지 본다',
+        ex: '이 약속들에서 함께 나타나는 점은 무엇인가요?' },
+      { ko: '나누어 보기', why: '기준을 세워 나누는 동안 개념의 테두리가 생긴다',
+        ex: '이것들을 두 무리로 나눈다면 어떤 기준으로 나눌 수 있을까요?' },
+      { ko: '경계 시험하기', why: '되는 것과 안 되는 것의 까닭을 물어 테두리를 또렷하게 한다',
+        ex: '이것도 규칙이라고 할 수 있을까요? 왜 그런가요?' },
+      { ko: '반례 던지기', why: '어긋나는 사례를 일부러 보여 개념을 다시 살피게 한다',
+        ex: '아무도 지키지 않는 약속도 규칙일까요?' },
+      { ko: '이름 붙이기', why: '사례 묶음에 학생이 직접 이름을 지으며 개념에 이른다',
+        ex: '이 무리에 이름을 붙인다면 뭐라고 부르면 좋을까요?' }
+    ];
+
     function esc(v) {
       return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
@@ -2013,6 +2028,14 @@
               '<span><b>개념</b> 개념과 개념의 관계를 묻는 질문</span>' +
               '<span><b>논쟁</b> 답이 갈리고 근거를 대야 하는 질문</span>' +
               '</div>' +
+              '<details class="group" id="s5-forming"><summary>형성 질문은 어떻게 만드나요' +
+              '<span class="group__count">다섯 갈래</span></summary><div class="formways">';
+      FORMING.forEach(function (f) {
+        h += '<div class="formway"><p class="formway__ko">' + esc(f.ko) +
+             '<span class="formway__why">' + esc(f.why) + '</span></p>' +
+             '<p class="formway__ex">' + esc(f.ex) + '</p></div>';
+      });
+      h += '</div></details>' +
               '<div class="rowbtns">' +
               '<button class="btn btn--primary" type="button" data-act="gen">' +
               (has ? '다시 받기' : '질문 받기') + '</button></div>' +
@@ -2033,6 +2056,7 @@
       h += '<textarea class="qrow__in" data-act="edit" data-k="' + kind + '" data-i="' + i + '" data-j="' + j + '"' +
            ' rows="1" placeholder="' + (kind === 't' ? '교사 발문' : '학생이 던질 법한 질문') + '">' +
            esc(text) + '</textarea>' +
+           (item && item.way ? '<span class="qrow__way">' + esc(item.way) + '</span>' : '') +
            '<button class="qrow__del" type="button" data-act="del" data-k="' + kind + '" data-i="' + i + '" data-j="' + j + '"' +
            ' aria-label="지우기">×</button></div>';
       return h;
@@ -2061,7 +2085,7 @@
         h += '</div>';
 
         h += '<div class="qgroup"><p class="qgroup__head">교사 발문' +
-             '<span class="qgroup__note">세 결이 고루 있으면 좋습니다</span></p>';
+             '<span class="qgroup__note">사실 → 형성 → 개념 → 논쟁 순으로 이어집니다</span></p>';
         (state.teacherQuestions[i] || []).forEach(function (q, j) { h += qrow('t', i, j, q); });
         h += '<button class="qadd" type="button" data-act="add" data-k="t" data-i="' + i + '">발문 추가</button></div>';
 
@@ -2100,9 +2124,14 @@
              '   - 사실: 자료를 찾거나 관찰하면 답이 정해지는 질문.\n' +
              '     예) 우리 학교에는 어떤 약속이 있나요?\n' +
              '   - 형성: 모아 놓은 사례에서 개념을 뽑아내게 하는 질문. ' +
-             '개념의 뜻을 아직 모르는 상태에서, 사례들의 공통점·차이점을 살펴 스스로 개념에 이르게 한다. ' +
+             '개념의 뜻을 아직 모르는 상태에서 스스로 개념에 이르게 한다. ' +
              '개념을 이미 아는 것으로 전제하고 묻지 않는다.\n' +
-             '     예) 이 약속들에서 함께 나타나는 점은 무엇인가요? / 규칙이라고 부를 수 있는 것과 아닌 것을 어떻게 나눌 수 있을까요?\n' +
+             '     아래 다섯 갈래 가운데 하나를 골라 만든다. 탐구 목록마다 서로 다른 갈래를 골라, ' +
+             '세 목록의 형성 질문이 모두 같은 형태가 되지 않게 한다.\n' +
+             FORMING.map(function (f) {
+               return '     · ' + f.ko + ' — ' + f.why + '. 예) ' + f.ex;
+             }).join('\n') + '\n' +
+             '     way 항목에 어느 갈래를 썼는지 위 이름 그대로 적는다.\n' +
              '   - 개념: 개념과 개념의 관계를 묻는 질문. 특정 사례에만 통하면 안 되고, 여러 사례에 걸쳐 통해야 한다.\n' +
              '     예) 규칙은 공동체에 어떤 영향을 주나요?\n' +
              '   - 논쟁: 답이 하나로 모이지 않고 근거를 들어 견주어야 하는 질문.\n' +
@@ -2115,7 +2144,9 @@
              '- 예 아니오로 끝나는 질문은 피한다.\n' +
              '- 고유명사와 특정 지명·인명을 넣지 않는다.\n\n' +
              '[출력] 다음 형태의 JSON만 출력한다. lines 배열의 순서는 위 탐구 목록 순서와 같게 한다.\n' +
-             '{ "lines": [ { "teacher": [ { "type": "사실", "text": "발문" } ], "student": ["학생 질문"] } ] }';
+             '{ "lines": [ { "teacher": [ { "type": "형성", "way": "나누어 보기", "text": "발문" } ], ' +
+             '"student": ["학생 질문"] } ] }\n' +
+             'way는 형성 질문에만 넣고 나머지 결에는 넣지 않는다.';
     }
 
     function generate() {
@@ -2132,7 +2163,14 @@
           var one = got[i] || {};
           tq.push((one.teacher || []).filter(function (q) { return q && q.text; }).map(function (q) {
             var t = String(q.type || '').trim();
-            return { type: TYPES.indexOf(t) >= 0 ? t : '사실', text: String(q.text).trim() };
+            var kind = TYPES.indexOf(t) >= 0 ? t : '사실';
+            var out = { type: kind, text: String(q.text).trim() };
+            if (kind === '형성' && q.way) {
+              var w = String(q.way).trim();
+              var known = FORMING.some(function (f) { return f.ko === w; });
+              if (known) out.way = w;
+            }
+            return out;
           }));
           sq.push((one.student || []).map(function (q) {
             return { text: String(typeof q === 'string' ? q : (q && q.text) || '').trim() };

@@ -634,6 +634,31 @@ html[data-theme="dark"] .qadd:hover{color:var(--pine)}
 }
 .qlegend b{color:var(--ink-2)}
 
+#s5-forming{margin-bottom:14px}
+.formways{padding:2px 15px 13px}
+.formway{padding:9px 0;border-top:1px solid var(--line-2)}
+.formway__ko{
+  display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
+  font-size:14.5px;font-weight:700;margin-bottom:3px;
+}
+.formway__why{font-size:13px;font-weight:500;color:var(--ink-3)}
+.formway__ex{
+  font-size:13.5px;color:var(--ink-2);line-height:1.5;
+  padding-left:10px;border-left:2px solid var(--line);
+}
+.qrow__way{
+  flex:none;align-self:flex-start;
+  font-size:11.5px;font-weight:700;line-height:1.6;
+  padding:5px 8px;border-radius:99px;
+  border:1px solid color-mix(in srgb,var(--pine) 40%,transparent);
+  color:var(--pine-ink);background:var(--pine-wash);
+  white-space:nowrap;
+}
+html[data-theme="dark"] .qrow__way{color:var(--pine)}
+@media (max-width: 700px){
+  .qrow__way{display:none}
+}
+
 /* ============================================================
    반응형
    ============================================================ */
