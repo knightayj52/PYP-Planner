@@ -186,6 +186,7 @@
     renderStep({ scroll: true });
     if (state.step === 2 && typeof S2 !== 'undefined') S2.repaint();
     if (state.step === 3 && typeof S3 !== 'undefined') S3.repaint();
+    if (state.step === 4 && typeof S4 !== 'undefined') S4.repaint();
   }
 
   /* ============================================================
@@ -1691,6 +1692,259 @@
   })();
 
   /* ============================================================
+   * 4단계 — 탐구 목록
+   *   중심 아이디어를 세 갈래로 펼친다.
+   *   개념 태그는 여러 개를 붙일 수 있다(1:1 매핑을 강제하지 않는다).
+   * ============================================================ */
+  var S4 = (function () {
+    var fw = null;
+    var WANT = 3;
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function msg(text, tone) {
+      var el = $('#s4-msg');
+      if (!el) return;
+      if (!text) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = text;
+      el.className = 'notice notice--' + (tone || 'info');
+    }
+    function koOf(id) {
+      var hit = id;
+      ((fw && fw.keyConcepts) || []).forEach(function (k) { if (k.id === id) hit = k.ko; });
+      return hit;
+    }
+    function lines() {
+      if (!Array.isArray(state.linesOfInquiry)) state.linesOfInquiry = [];
+      return state.linesOfInquiry;
+    }
+
+    function ensure() {
+      return loadData('pyp-framework').then(function (d) { fw = d; return true; });
+    }
+
+    /* ---- 그리기 ---- */
+    function paintGen() {
+      var has = lines().length > 0;
+      var h = '<h3 class="block__title"><span class="block__ord">1</span>탐구 목록 만들기</h3>' +
+              '<p class="block__hint">중심 아이디어를 세 갈래로 펼칩니다. 각 갈래는 학생이 무엇을 파고들지 ' +
+              '한 줄로 나타냅니다. 받은 뒤 얼마든지 고쳐 쓸 수 있고, 직접 추가할 수도 있습니다.</p>';
+
+      if (state.centralIdea) {
+        h += '<div class="anchor"><p class="anchor__src">중심 아이디어</p>' +
+             '<p class="anchor__text">' + esc(state.centralIdea) + '</p></div>';
+      }
+      h += '<div class="rowbtns">' +
+           '<button class="btn btn--primary" type="button" data-act="gen">' +
+           (has ? '다시 받기' : '세 갈래 받기') + '</button>' +
+           '<button class="btn" type="button" data-act="add">직접 추가</button>' +
+           '</div><p class="notice notice--info" id="s4-msg" hidden></p>';
+      $('#s4-gen').innerHTML = h;
+    }
+
+    function paintList() {
+      var box = $('#s4-list');
+      var arr = lines();
+      if (!arr.length) { box.innerHTML = ''; return; }
+
+      var picked = state.keyConcepts || [];
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>개념 태그 붙이기</h3>' +
+              '<p class="block__hint">각 갈래가 어떤 주요 개념을 다루는지 표시합니다. ' +
+              '한 갈래에 두 개념이 걸려도 괜찮고, 한 개념이 여러 갈래에 걸쳐도 괜찮습니다.</p>';
+
+      arr.forEach(function (item, i) {
+        h += '<div class="loi"><div class="loi__head">' +
+             '<span class="loi__ord">' + (i + 1) + '</span>' +
+             '<span class="pick__meta">탐구 목록 ' + (i + 1) + '</span>' +
+             '<button class="loi__del" type="button" data-act="del" data-i="' + i + '">지우기</button>' +
+             '</div>' +
+             '<textarea class="loi__text" data-act="edit" data-i="' + i + '" ' +
+             'placeholder="예: 규칙이 만들어지는 과정">' + esc(item.text || '') + '</textarea>' +
+             '<div class="loi__tags"><span class="loi__label">개념</span>';
+        picked.forEach(function (id) {
+          var on = (item.concepts || []).indexOf(id) >= 0;
+          h += '<button class="tagbtn" type="button" data-act="tag" data-i="' + i + '" data-v="' + esc(id) + '"' +
+               ' aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(koOf(id)) + '</button>';
+        });
+        h += '</div></div>';
+      });
+
+      // 고른 주요 개념 가운데 어디에도 안 붙은 것을 알려 준다
+      var used = {};
+      arr.forEach(function (it) { (it.concepts || []).forEach(function (c) { used[c] = 1; }); });
+      var miss = picked.filter(function (id) { return !used[id]; });
+      h += '<div class="coverage"><b>탐구 목록 ' + arr.length + '개</b>';
+      if (miss.length) {
+        h += '<span class="coverage__miss">' + miss.map(koOf).join(' · ') + ' 아직 안 붙음</span>';
+      } else if (picked.length) {
+        h += '<span>고르신 주요 개념이 모두 어딘가에 걸려 있습니다.</span>';
+      }
+      h += '</div>';
+      box.innerHTML = h;
+    }
+
+    function paintAll() {
+      if (!fw) return;
+      paintGen(); paintList();
+      saveDraft();
+    }
+
+    /* ---- 생성 ---- */
+    function buildPrompt() {
+      var kc = (state.keyConcepts || []).map(function (id) {
+        var k = null;
+        ((fw && fw.keyConcepts) || []).forEach(function (x) { if (x.id === id) k = x; });
+        return k ? ('- ' + k.ko + ' (' + k.id + '): ' + k.keyQuestion) : ('- ' + id);
+      }).join('\n');
+      var rc = (state.relatedConcepts || []).join(', ');
+      var stds = (state.standards || []).map(function (o) {
+        return '- ' + o.code + ' ' + o.text;
+      }).join('\n');
+
+      return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+             '[학년] ' + state.grade + '학년\n' +
+             '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
+             '[주요 개념]\n' + kc + '\n' +
+             (rc ? '[관련 개념] ' + rc + '\n' : '') + '\n' +
+             '[고른 성취기준]\n' + stds + '\n\n' +
+             '[할 일] 이 중심 아이디어를 파고드는 탐구 목록(lines of inquiry) 3개를 만든다.\n' +
+             '탐구 목록의 조건:\n' +
+             '- 질문이 아니라 명사구로 쓴다. 물음표를 쓰지 않는다.\n' +
+             '  좋은 예: 규칙이 만들어지는 과정 / 공동체마다 다른 약속의 모습\n' +
+             '  나쁜 예: 규칙은 어떻게 만들어질까? / 규칙 만들기 활동하기\n' +
+             '- 활동명이 아니라 탐구할 내용으로 쓴다.\n' +
+             '- 셋을 합치면 중심 아이디어 전체가 덮이도록 서로 다른 갈래를 잡는다.\n' +
+             '- ' + state.grade + '학년 학생이 읽고 무엇을 알아볼지 짐작할 수 있는 낱말로 쓴다.\n' +
+             '- 각 갈래에 어떤 주요 개념이 걸리는지 위 목록의 영문 id로 표시한다. ' +
+             '하나에 두 개념이 걸려도 되고, 셋을 합쳐 고른 개념이 모두 한 번은 나오게 한다.\n\n' +
+             '[출력] 다음 형태의 JSON만 출력한다.\n' +
+             '{ "lines": [ { "text": "탐구 목록 한 줄", "concepts": ["function"] } ] }';
+    }
+
+    function generate() {
+      if (!state.centralIdea) { msg('2단계에서 중심 아이디어를 먼저 써 주세요.', 'warn'); return; }
+      if (!(state.keyConcepts || []).length) { msg('3단계에서 주요 개념을 먼저 골라 주세요.', 'warn'); return; }
+
+      var btn = $('#s4-gen [data-act="gen"]');
+      if (btn) { btn.disabled = true; btn.textContent = '만드는 중…'; }
+      msg('중심 아이디어를 세 갈래로 펼치는 중입니다. 15초쯤 걸립니다.', 'info');
+
+      callGemini(buildPrompt()).then(function (res) {
+        var got = (res && res.lines) || [];
+        var picked = state.keyConcepts || [];
+        state.linesOfInquiry = got
+          .filter(function (l) { return l && l.text; })
+          .slice(0, 4)
+          .map(function (l) {
+            var tags = (l.concepts || []).filter(function (c) { return picked.indexOf(c) >= 0; });
+            return { text: String(l.text).trim().replace(/\?$/, ''), concepts: tags };
+          });
+        paintAll();
+        msg(state.linesOfInquiry.length
+          ? '탐구 목록 ' + state.linesOfInquiry.length + '개를 만들었습니다. 우리 반 말로 고쳐 쓰고 개념 태그를 확인해 주세요.'
+          : '탐구 목록을 만들지 못했습니다. 다시 눌러 주세요.', 'info');
+      })['catch'](function (e) {
+        paintAll();
+        msg(msgOf(e), 'stop');
+      });
+    }
+
+    /* ---- 조작 ---- */
+    function addOne() {
+      lines().push({ text: '', concepts: [] });
+      paintAll();
+      var boxes = $$('#s4-list .loi__text');
+      if (boxes.length) boxes[boxes.length - 1].focus();
+    }
+    function delOne(i) {
+      var arr = lines();
+      if (i < 0 || i >= arr.length) return;
+      arr.splice(i, 1);
+      paintAll();
+    }
+    function toggleTag(i, id) {
+      var item = lines()[i];
+      if (!item) return;
+      item.concepts = item.concepts || [];
+      var at = item.concepts.indexOf(id);
+      if (at >= 0) item.concepts.splice(at, 1); else item.concepts.push(id);
+      // 태그만 바뀌었으므로 편집 중인 글은 건드리지 않는다
+      var btn = $('#s4-list [data-act="tag"][data-i="' + i + '"][data-v="' + id + '"]');
+      if (btn) btn.setAttribute('aria-pressed', at >= 0 ? 'false' : 'true');
+      paintCoverage();
+      saveDraft();
+    }
+    function paintCoverage() {
+      var box = $('#s4-list .coverage');
+      if (!box) return;
+      var picked = state.keyConcepts || [];
+      var used = {};
+      lines().forEach(function (it) { (it.concepts || []).forEach(function (c) { used[c] = 1; }); });
+      var miss = picked.filter(function (id) { return !used[id]; });
+      var h = '<b>탐구 목록 ' + lines().length + '개</b>';
+      if (miss.length) h += '<span class="coverage__miss">' + miss.map(koOf).join(' · ') + ' 아직 안 붙음</span>';
+      else if (picked.length) h += '<span>고르신 주요 개념이 모두 어딘가에 걸려 있습니다.</span>';
+      box.innerHTML = h;
+    }
+
+    function bindStep4() {
+      var root = $('#step-4');
+      root.addEventListener('click', function (ev) {
+        var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+        if (!el || !root.contains(el)) return;
+        var act = el.getAttribute('data-act');
+        if (act === 'gen') generate();
+        if (act === 'add') addOne();
+        if (act === 'del') delOne(Number(el.getAttribute('data-i')));
+        if (act === 'tag') toggleTag(Number(el.getAttribute('data-i')), el.getAttribute('data-v'));
+      });
+      root.addEventListener('input', function (ev) {
+        var t = ev.target;
+        if (t && t.matches && t.matches('[data-act="edit"]')) {
+          var item = lines()[Number(t.getAttribute('data-i'))];
+          if (item) { item.text = t.value; saveDraft(); }
+        }
+      });
+    }
+
+    registerGuard(4, function (st) {
+      var hard = [], soft = [];
+      var arr = (st.linesOfInquiry || []).filter(function (l) { return String(l.text || '').trim(); });
+      if (!arr.length) hard.push('탐구 목록을 하나 이상 써 주세요.');
+
+      if (!hard.length) {
+        if (arr.length !== WANT) {
+          soft.push('탐구 목록이 ' + arr.length + '개입니다. 보통 세 개로 씁니다.');
+        }
+        var q = arr.filter(function (l) { return /[?？]/.test(l.text); });
+        if (q.length) soft.push('탐구 목록에 물음표가 있습니다. 질문은 5단계에서 따로 씁니다.');
+
+        var noTag = arr.filter(function (l) { return !(l.concepts || []).length; });
+        if (noTag.length) soft.push('개념 태그가 없는 탐구 목록이 ' + noTag.length + '개 있습니다.');
+
+        var used = {};
+        arr.forEach(function (l) { (l.concepts || []).forEach(function (c) { used[c] = 1; }); });
+        var miss = (st.keyConcepts || []).filter(function (id) { return !used[id]; });
+        if (miss.length) {
+          soft.push('주요 개념 ' + miss.map(koOf).join(' · ') + '이(가) 어느 탐구 목록에도 걸려 있지 않습니다.');
+        }
+      }
+      return { hard: hard, soft: soft };
+    });
+
+    function init() {
+      bindStep4();
+      ensure().then(paintAll)['catch'](function () { /* 데이터가 없으면 조용히 넘어간다 */ });
+    }
+
+    return { init: init, repaint: paintAll };
+  })();
+
+  /* ============================================================
    * 테마
    * ============================================================ */
   function applyTheme(mode) {
@@ -1758,6 +2012,7 @@
     S1.init();
     S2.init();
     S3.init();
+    S4.init();
   }
 
   if (document.readyState === 'loading') {

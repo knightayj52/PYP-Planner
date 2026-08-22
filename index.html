@@ -518,6 +518,54 @@ html[data-theme="dark"] .rc[aria-pressed="true"]{color:#0C1512}
 .review--fit{border-left-color:var(--pine);background:var(--pine-wash)}
 .review--fit .review__head{color:var(--pine-ink)}
 
+/* ---- 4단계: 탐구 목록 ---- */
+.loi{
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px;margin-bottom:11px;
+}
+.loi__head{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.loi__ord{
+  flex:none;width:24px;height:24px;border-radius:99px;
+  display:grid;place-items:center;
+  background:var(--pine);color:#fff;
+  font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;
+}
+html[data-theme="dark"] .loi__ord{color:#0C1512}
+.loi__del{
+  margin-left:auto;background:none;border:0;cursor:pointer;
+  color:var(--ink-3);font-size:13px;font-weight:600;padding:3px 7px;border-radius:5px;
+}
+.loi__del:hover{color:var(--alert);background:var(--alert-wash)}
+.loi__text{
+  width:100%;min-height:56px;padding:10px 12px;
+  background:var(--paper);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-size:15px;line-height:1.55;resize:vertical;
+}
+.loi__text:focus{outline:2px solid var(--pine);border-color:var(--pine)}
+.loi__tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;align-items:center}
+.loi__label{font-size:12.5px;font-weight:700;color:var(--ink-3);margin-right:2px}
+.tagbtn{
+  height:29px;padding:0 11px;
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:99px;
+  font-size:13px;font-weight:600;cursor:pointer;
+}
+.tagbtn:hover{border-color:var(--ink-3)}
+.tagbtn[aria-pressed="true"]{background:var(--pine);border-color:var(--pine);color:#fff}
+html[data-theme="dark"] .tagbtn[aria-pressed="true"]{color:#0C1512}
+.coverage{
+  display:flex;flex-wrap:wrap;gap:7px;align-items:center;
+  margin-top:4px;font-size:13.5px;color:var(--ink-3);
+}
+.coverage b{font-weight:700;color:var(--ink-2)}
+.coverage__miss{
+  font-size:12.5px;font-weight:700;padding:1px 8px;border-radius:99px;
+  border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);
+  background:var(--warn-wash);color:var(--warn);
+}
+
 /* ============================================================
    반응형
    ============================================================ */
@@ -680,7 +728,8 @@ html[data-theme="dark"] .rc[aria-pressed="true"]{color:#0C1512}
         <h2 class="step__title" id="t4">탐구 목록 쓰기</h2>
         <p class="step__hint">중심 아이디어를 세 갈래로 나누어 탐구 목록을 씁니다. 각 목록에 주요 개념 태그를 붙이되, 한 목록에 두 개념이 함께 걸려도 괜찮습니다.</p>
       </div>
-      <div class="placeholder"><strong>탐구 목록 3개 · 개념 태그</strong>다음 작업에서 채웁니다.</div>
+      <div class="block" id="s4-gen"></div>
+      <div class="block" id="s4-list"></div>
     </section>
 
     <section class="step" id="step-5" data-step="5" aria-labelledby="t5">
