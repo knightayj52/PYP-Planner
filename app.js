@@ -61,7 +61,8 @@
       diagnostic: '',
       formative: '',
       summative: '',
-      grasps: null,
+      frame: null,              // null | 'grasps' | 'rafts'
+      frameData: {},            // 고른 틀의 칸 내용
       criteria: { knowledge: '', understanding: '', skills: '' }
     },
 
@@ -1938,7 +1939,7 @@
         arr.forEach(function (l) { (l.concepts || []).forEach(function (c) { used[c] = 1; }); });
         var miss = (st.keyConcepts || []).filter(function (id) { return !used[id]; });
         if (miss.length) {
-          soft.push('주요 개념 ' + miss.map(koOf).join(' · ') + '이(가) 어느 탐구 목록에도 걸려 있지 않습니다.');
+          soft.push('주요 개념 가운데 ' + miss.map(koOf).join(' · ') + ' 항목이 어느 탐구 목록에도 걸려 있지 않습니다.');
         }
       }
       return { hard: hard, soft: soft };
@@ -2290,6 +2291,375 @@
   })();
 
   /* ============================================================
+   * 6단계 — 평가
+   *   ① 진단·형성·총괄 세 가지와 도달 기준을 한 번에 받는다.
+   *   ② 총괄평가를 써 본 뒤, 원하면 GRASPS 또는 RAFTS 틀로 펼친다(별도 호출).
+   *      두 틀은 항목이 서로 달라 내용이 이월되지 않는다.
+   * ============================================================ */
+  var S6 = (function () {
+    var fw = null;
+
+    var THREE = [
+      { id: 'diagnostic', ko: '진단평가', when: '단원 열 때',
+        why: '학생이 이미 무엇을 알고 있고 어떤 오개념을 가졌는지 살핍니다.' },
+      { id: 'formative', ko: '형성평가', when: '탐구하는 동안',
+        why: '탐구가 흘러가는 중에 이해가 어디쯤 왔는지 확인하고 수업을 조정합니다.' },
+      { id: 'summative', ko: '총괄평가', when: '단원 닫을 때',
+        why: '중심 아이디어에 이르렀는지를 학생이 드러내 보이는 자리입니다.' }
+    ];
+
+    var CRIT = [
+      { id: 'knowledge', ko: '지식', why: '무엇을 알게 되는가' },
+      { id: 'understanding', ko: '이해', why: '무엇을 이해하게 되는가' },
+      { id: 'skills', ko: '기능', why: '무엇을 할 수 있게 되는가' }
+    ];
+
+    var FRAMES = {
+      grasps: {
+        ko: 'GRASPS', note: '실제 상황 속에서 무언가를 해내는 수행 과제에 어울립니다.',
+        slots: [
+          { id: 'goal', ko: '목표', en: 'Goal', hint: '무엇을 이루어야 하는 상황인가' },
+          { id: 'role', ko: '역할', en: 'Role', hint: '학생이 누구가 되는가' },
+          { id: 'audience', ko: '청중', en: 'Audience', hint: '누구를 향해 하는 일인가' },
+          { id: 'situation', ko: '상황', en: 'Situation', hint: '어떤 형편에 놓여 있는가' },
+          { id: 'product', ko: '산출물', en: 'Product', hint: '무엇을 만들어 내는가' },
+          { id: 'standards', ko: '기준', en: 'Standards', hint: '무엇을 갖추어야 잘한 것인가' }
+        ]
+      },
+      rafts: {
+        ko: 'RAFTS', note: '글이나 발표처럼 목소리를 담아 표현하는 결과물에 어울립니다.',
+        slots: [
+          { id: 'role', ko: '역할', en: 'Role', hint: '누구의 목소리로 말하는가' },
+          { id: 'audience', ko: '청중', en: 'Audience', hint: '누구에게 말하는가' },
+          { id: 'format', ko: '형식', en: 'Format', hint: '어떤 형식으로 담는가' },
+          { id: 'topic', ko: '주제', en: 'Topic', hint: '무엇에 대해 말하는가' },
+          { id: 'strong', ko: '강한 동사', en: 'Strong verb', hint: '설득한다·고발한다처럼 태도를 담은 동사' }
+        ]
+      }
+    };
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function msg(id, text, tone) {
+      var el = $(id);
+      if (!el) return;
+      if (!text) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = text;
+      el.className = 'notice notice--' + (tone || 'info');
+    }
+    function A() {
+      if (!state.assessment) state.assessment = {};
+      var a = state.assessment;
+      if (!a.criteria) a.criteria = { knowledge: '', understanding: '', skills: '' };
+      if (!a.frameData) a.frameData = {};
+      return a;
+    }
+    function koOf(id) {
+      var hit = id;
+      ((fw && fw.keyConcepts) || []).forEach(function (k) { if (k.id === id) hit = k.ko; });
+      return hit;
+    }
+    function loi() {
+      return (state.linesOfInquiry || []).filter(function (l) { return String(l.text || '').trim(); });
+    }
+
+    function ensure() {
+      return loadData('pyp-framework').then(function (d) { fw = d; return true; });
+    }
+
+    /* ---- 그리기 ---- */
+    function paintGen() {
+      var a = A();
+      var has = a.diagnostic || a.formative || a.summative;
+      var h = '<h3 class="block__title"><span class="block__ord">1</span>평가 마련하기</h3>' +
+              '<p class="block__hint">진단 · 형성 · 총괄 세 가지와 도달 기준을 함께 받습니다. ' +
+              '받은 뒤 우리 반 사정에 맞게 고쳐 쓰세요.</p>';
+      if (state.centralIdea) {
+        h += '<div class="anchor"><p class="anchor__src">중심 아이디어</p>' +
+             '<p class="anchor__text">' + esc(state.centralIdea) + '</p></div>';
+      }
+      h += '<div class="rowbtns">' +
+           '<button class="btn btn--primary" type="button" data-act="gen">' +
+           (has ? '다시 받기' : '평가 받기') + '</button></div>' +
+           '<p class="notice notice--info" id="s6-msg" hidden></p>';
+      $('#s6-gen').innerHTML = h;
+    }
+
+    function paintThree() {
+      var a = A();
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>세 가지 평가</h3>' +
+              '<p class="block__hint">언제 어떻게 볼지를 적습니다. 총괄평가는 아래에서 틀로 펼칠 수 있습니다.</p>';
+      THREE.forEach(function (t) {
+        h += '<div class="asm"><div class="asm__head">' +
+             '<span class="asm__ko">' + esc(t.ko) + '</span>' +
+             '<span class="asm__when">' + esc(t.when) + '</span></div>' +
+             '<p class="asm__why">' + esc(t.why) + '</p>' +
+             '<textarea class="asm__in" data-act="asm" data-k="' + t.id + '" ' +
+             'placeholder="' + esc(t.ko) + ' 계획">' + esc(a[t.id] || '') + '</textarea></div>';
+      });
+      $('#s6-three').innerHTML = h;
+    }
+
+    function paintFrame() {
+      var a = A();
+      var h = '<h3 class="block__title"><span class="block__ord">3</span>총괄평가 틀로 펼치기 <span class="pick__meta">(선택)</span></h3>' +
+              '<p class="block__hint">틀 없이 그대로 두셔도 됩니다. 수행 과제를 또렷하게 하고 싶을 때만 고르세요.</p>' +
+              '<div class="frame">' +
+              '<button class="frame__btn" type="button" data-act="frame" data-v="none"' +
+              ' aria-pressed="' + (!a.frame ? 'true' : 'false') + '">틀 안 씀</button>' +
+              '<button class="frame__btn" type="button" data-act="frame" data-v="grasps"' +
+              ' aria-pressed="' + (a.frame === 'grasps' ? 'true' : 'false') + '">GRASPS</button>' +
+              '<button class="frame__btn" type="button" data-act="frame" data-v="rafts"' +
+              ' aria-pressed="' + (a.frame === 'rafts' ? 'true' : 'false') + '">RAFTS</button>' +
+              '</div>';
+
+      if (!a.frame) { $('#s6-frame').innerHTML = h; return; }
+
+      var f = FRAMES[a.frame];
+      h += '<p class="frame__note">' + esc(f.note) +
+           ' 두 틀은 항목이 서로 달라, 틀을 바꾸면 여기 쓰신 내용은 옮겨지지 않습니다.</p>' +
+           '<div class="rowbtns">' +
+           '<button class="btn" type="button" data-act="fill">' + esc(f.ko) + ' 칸 채워받기</button>' +
+           '<button class="btn" type="button" data-act="toSummative">이 내용으로 총괄평가 다시 쓰기</button>' +
+           '</div><p class="notice notice--info" id="s6-fmsg" hidden></p>';
+
+      f.slots.forEach(function (sl) {
+        h += '<div class="slot"><label class="slot__key" for="s6-' + sl.id + '">' + esc(sl.ko) +
+             '<small>' + esc(sl.en) + '</small></label>' +
+             '<textarea class="slot__in" id="s6-' + sl.id + '" data-act="slot" data-k="' + sl.id + '" ' +
+             'placeholder="' + esc(sl.hint) + '">' + esc((a.frameData || {})[sl.id] || '') + '</textarea></div>';
+      });
+      $('#s6-frame').innerHTML = h;
+    }
+
+    function paintCrit() {
+      var a = A();
+      var h = '<h3 class="block__title"><span class="block__ord">4</span>도달 기준</h3>' +
+              '<p class="block__hint">이 단원을 마쳤을 때 학생이 어디까지 이르면 되는지 적습니다.</p>' +
+              '<div class="crit">';
+      CRIT.forEach(function (c) {
+        h += '<div class="crit__cell"><p class="crit__ko">' + esc(c.ko) + '</p>' +
+             '<p class="crit__why">' + esc(c.why) + '</p>' +
+             '<textarea class="crit__in" data-act="crit" data-k="' + c.id + '" ' +
+             'placeholder="' + esc(c.ko) + ' 도달 기준">' + esc(a.criteria[c.id] || '') + '</textarea></div>';
+      });
+      $('#s6-crit').innerHTML = h + '</div>';
+    }
+
+    function paintAll() {
+      if (!fw) return;
+      paintGen(); paintThree(); paintFrame(); paintCrit();
+      saveDraft();
+    }
+
+    /* ---- 공통 맥락 ---- */
+    function context() {
+      var kc = (state.keyConcepts || []).map(koOf).join(', ');
+      var lines = loi().map(function (l, i) { return (i + 1) + ') ' + l.text; }).join('\n');
+      var stds = (state.standards || []).map(function (o) {
+        return '- ' + o.code + ' ' + o.text;
+      }).join('\n');
+      return '[학년] ' + state.grade + '학년\n' +
+             '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
+             (kc ? '[주요 개념] ' + kc + '\n' : '') +
+             '[탐구 목록]\n' + lines + '\n\n' +
+             '[고른 성취기준]\n' + stds + '\n';
+    }
+
+    /* ---- 생성 ① 평가 세 가지 + 도달 기준 ---- */
+    function buildPrompt() {
+      return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+             context() + '\n' +
+             '[할 일] 이 단원의 평가를 마련한다.\n' +
+             '- 진단평가: 단원을 열 때 학생이 이미 아는 것과 오개념을 살피는 방법. ' +
+             '점수를 매기는 시험이 아니라 드러내 보이게 하는 활동으로 쓴다.\n' +
+             '- 형성평가: 탐구가 흘러가는 동안 이해가 어디쯤 왔는지 확인하는 방법. ' +
+             '탐구 목록의 진행과 맞물리게 쓴다.\n' +
+             '- 총괄평가: 중심 아이디어에 이르렀는지를 학생이 드러내 보이는 과제. ' +
+             '단순 지식 확인이 아니라 배운 것을 새로운 상황에 써 보게 하는 과제로 쓴다.\n' +
+             '- 도달 기준: 지식(무엇을 알게 되는가), 이해(무엇을 이해하게 되는가), ' +
+             '기능(무엇을 할 수 있게 되는가)을 각각 한두 문장으로 쓴다. ' +
+             '이해는 중심 아이디어와 이어지게 쓴다.\n\n' +
+             '공통 조건:\n' +
+             '- ' + state.grade + '학년 교실에서 실제로 할 수 있는 방법으로 쓴다.\n' +
+             '- 평서형 종결어미(-다)로 끝낸다. 존댓말 어미를 쓰지 않는다.\n' +
+             '- 고유명사와 특정 지명·인명을 넣지 않는다.\n\n' +
+             '[출력] 다음 형태의 JSON만 출력한다.\n' +
+             '{ "diagnostic": "진단평가", "formative": "형성평가", "summative": "총괄평가", ' +
+             '"criteria": { "knowledge": "지식", "understanding": "이해", "skills": "기능" } }';
+    }
+
+    function generate() {
+      if (!state.centralIdea) { msg('#s6-msg', '2단계에서 중심 아이디어를 먼저 써 주세요.', 'warn'); return; }
+      var btn = $('#s6-gen [data-act="gen"]');
+      if (btn) { btn.disabled = true; btn.textContent = '만드는 중…'; }
+      msg('#s6-msg', '중심 아이디어와 탐구 목록에 맞춰 평가를 짜는 중입니다. 20초쯤 걸립니다.', 'info');
+
+      callGemini(buildPrompt()).then(function (res) {
+        var a = A();
+        a.diagnostic = String((res && res.diagnostic) || '').trim();
+        a.formative = String((res && res.formative) || '').trim();
+        a.summative = String((res && res.summative) || '').trim();
+        var c = (res && res.criteria) || {};
+        a.criteria = {
+          knowledge: String(c.knowledge || '').trim(),
+          understanding: String(c.understanding || '').trim(),
+          skills: String(c.skills || '').trim()
+        };
+        paintAll();
+        msg('#s6-msg', a.summative
+          ? '평가와 도달 기준을 만들었습니다. 우리 반 사정에 맞게 고쳐 쓰세요.'
+          : '평가를 만들지 못했습니다. 다시 눌러 주세요.', a.summative ? 'info' : 'warn');
+      })['catch'](function (e) {
+        paintAll();
+        msg('#s6-msg', msgOf(e), 'stop');
+      });
+    }
+
+    /* ---- 생성 ② 고른 틀의 칸 채우기 ---- */
+    function buildFramePrompt() {
+      var a = A();
+      var f = FRAMES[a.frame];
+      var slots = f.slots.map(function (sl) {
+        return '- ' + sl.id + ' (' + sl.ko + '): ' + sl.hint;
+      }).join('\n');
+
+      return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+             context() + '\n' +
+             '[지금의 총괄평가] ' + (a.summative || '(아직 없음)') + '\n\n' +
+             '[할 일] 위 총괄평가를 ' + f.ko + ' 틀로 펼친다. 아래 칸을 모두 채운다.\n' +
+             slots + '\n\n' +
+             '조건:\n' +
+             '- 지금의 총괄평가에서 벗어나지 않는다. 같은 과제를 틀에 맞춰 또렷하게 하는 것이다.\n' +
+             '- ' + state.grade + '학년 학생이 읽고 무엇을 할지 알 수 있는 말로 쓴다.\n' +
+             '- 각 칸은 한두 문장으로 짧게 쓴다.\n' +
+             '- 고유명사와 실제 기관·인물 이름을 넣지 않는다. 역할과 청중은 일반적인 말로 쓴다.\n\n' +
+             '[출력] 다음 형태의 JSON만 출력한다. 위 칸 이름을 그대로 쓴다.\n' +
+             '{ ' + f.slots.map(function (sl) { return '"' + sl.id + '": "내용"'; }).join(', ') + ' }';
+    }
+
+    function fillFrame() {
+      var a = A();
+      if (!a.frame) return;
+      if (!a.summative) { msg('#s6-fmsg', '먼저 위에서 총괄평가를 써 주세요.', 'warn'); return; }
+      var btn = $('#s6-frame [data-act="fill"]');
+      if (btn) { btn.disabled = true; btn.textContent = '채우는 중…'; }
+      msg('#s6-fmsg', '총괄평가를 틀에 맞춰 펼치는 중입니다. 15초쯤 걸립니다.', 'info');
+
+      callGemini(buildFramePrompt()).then(function (res) {
+        var f = FRAMES[a.frame];
+        var got = {};
+        f.slots.forEach(function (sl) {
+          var v = res && res[sl.id];
+          if (v) got[sl.id] = String(v).trim();
+        });
+        a.frameData = got;
+        paintAll();
+        var n = Object.keys(got).length;
+        msg('#s6-fmsg', n
+          ? f.ko + ' 칸 ' + n + '개를 채웠습니다. 고쳐 쓰신 뒤 아래 버튼으로 총괄평가에 반영할 수 있습니다.'
+          : '칸을 채우지 못했습니다. 다시 눌러 주세요.', n ? 'info' : 'warn');
+      })['catch'](function (e) {
+        paintAll();
+        msg('#s6-fmsg', msgOf(e), 'stop');
+      });
+    }
+
+    /** 칸 내용을 모아 총괄평가 서술로 옮긴다. 호출 없음. */
+    function toSummative() {
+      var a = A();
+      if (!a.frame) return;
+      var f = FRAMES[a.frame];
+      var parts = [];
+      f.slots.forEach(function (sl) {
+        var v = String((a.frameData || {})[sl.id] || '').trim();
+        if (v) parts.push(sl.ko + ': ' + v);
+      });
+      if (!parts.length) { msg('#s6-fmsg', '먼저 칸을 채워 주세요.', 'warn'); return; }
+      a.summative = '[' + f.ko + '] ' + parts.join(' / ');
+      paintAll();
+      msg('#s6-fmsg', '총괄평가 칸에 옮겼습니다. 위에서 다듬어 주세요.', 'info');
+    }
+
+    /* ---- 조작 ---- */
+    function pickFrame(v) {
+      var a = A();
+      var next = (v === 'none') ? null : v;
+      if (a.frame === next) return;
+      // 두 틀은 항목이 달라 내용을 옮길 수 없다. 바꾸면 비운다.
+      a.frame = next;
+      a.frameData = {};
+      paintAll();
+    }
+
+    function bindStep6() {
+      var root = $('#step-6');
+      root.addEventListener('click', function (ev) {
+        var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+        if (!el || !root.contains(el)) return;
+        var act = el.getAttribute('data-act');
+        if (act === 'gen') generate();
+        if (act === 'frame') pickFrame(el.getAttribute('data-v'));
+        if (act === 'fill') fillFrame();
+        if (act === 'toSummative') toSummative();
+      });
+      root.addEventListener('input', function (ev) {
+        var t = ev.target;
+        if (!t || !t.matches) return;
+        var a = A();
+        var k = t.getAttribute('data-k');
+        if (t.matches('[data-act="asm"]')) { a[k] = t.value; saveDraft(); }
+        else if (t.matches('[data-act="crit"]')) { a.criteria[k] = t.value; saveDraft(); }
+        else if (t.matches('[data-act="slot"]')) { a.frameData[k] = t.value; saveDraft(); }
+      });
+    }
+
+    registerGuard(6, function (st) {
+      var hard = [], soft = [];
+      var a = st.assessment || {};
+      var c = a.criteria || {};
+      var t = function (v) { return String(v || '').trim(); };
+
+      if (!t(a.summative)) hard.push('총괄평가를 써 주세요. 단원이 어디로 향하는지 정하는 자리입니다.');
+
+      if (!hard.length) {
+        var miss = [];
+        if (!t(a.diagnostic)) miss.push('진단평가');
+        if (!t(a.formative)) miss.push('형성평가');
+        if (miss.length) soft.push(miss.join(' · ') + ' 칸이 비어 있습니다.');
+
+        var cm = [];
+        if (!t(c.knowledge)) cm.push('지식');
+        if (!t(c.understanding)) cm.push('이해');
+        if (!t(c.skills)) cm.push('기능');
+        if (cm.length) soft.push('도달 기준에서 ' + cm.join(' · ') + ' 칸이 비어 있습니다.');
+
+        if (a.frame) {
+          var f = FRAMES[a.frame];
+          var empty = f.slots.filter(function (sl) { return !t((a.frameData || {})[sl.id]); });
+          if (empty.length === f.slots.length) {
+            soft.push(f.ko + ' 틀을 골랐지만 칸이 모두 비어 있습니다.');
+          } else if (empty.length) {
+            soft.push(f.ko + ' 틀에서 ' + empty.map(function (sl) { return sl.ko; }).join(' · ') + ' 칸이 비어 있습니다.');
+          }
+        }
+      }
+      return { hard: hard, soft: soft };
+    });
+
+    function init() {
+      bindStep6();
+      ensure().then(paintAll)['catch'](function () { /* 데이터가 없으면 조용히 넘어간다 */ });
+    }
+
+    return { init: init, repaint: paintAll };
+  })();
+
+  /* ============================================================
    * 테마
    * ============================================================ */
   function applyTheme(mode) {
@@ -2359,10 +2729,12 @@
     S3.init();
     S4.init();
     S5.init();
+    S6.init();
     registerPainter(2, S2.repaint);
     registerPainter(3, S3.repaint);
     registerPainter(4, S4.repaint);
     registerPainter(5, S5.repaint);
+    registerPainter(6, S6.repaint);
   }
 
   if (document.readyState === 'loading') {
