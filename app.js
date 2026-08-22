@@ -251,9 +251,33 @@
   function saveApiKey() {
     var value = $('#key-input').value.trim();
     if (!value) { keyMessage('키를 입력해 주세요.', 'stop'); return; }
-    store(KEYS.apiKey, value);
-    paintKeyState();
-    keyMessage('키를 저장했습니다. 연결 확인은 첫 생성 요청 때 이루어집니다.', 'info');
+    if (value.length < 20) {
+      keyMessage('키가 너무 짧습니다. AI Studio에서 복사한 키 전체를 붙여넣어 주세요.', 'stop');
+      return;
+    }
+    var btn = $('#btn-key-save');
+    btn.disabled = true;
+    keyMessage('키를 확인하는 중입니다…', 'info');
+
+    verifyApiKey(value).then(function (status) {
+      btn.disabled = false;
+      if (status === 'invalid') {
+        keyMessage('키가 받아들여지지 않았습니다. Google AI Studio에서 키를 다시 복사해 주세요.', 'stop');
+        return;
+      }
+      store(KEYS.apiKey, value);
+      paintKeyState();
+      if (status === 'quota') {
+        keyMessage('키를 저장했습니다. 다만 지금은 호출 한도 상태라 잠시 뒤부터 쓸 수 있습니다.', 'warn');
+      } else if (status === 'network') {
+        keyMessage('키를 저장했습니다. 인터넷 연결이 불안정해 확인은 못 했습니다.', 'warn');
+      } else {
+        keyMessage('키를 저장했고 연결도 확인했습니다.', 'info');
+      }
+    })['catch'](function (e) {
+      btn.disabled = false;
+      keyMessage('확인 중 문제가 생겼습니다. ' + msgOf(e), 'stop');
+    });
   }
 
   function clearApiKey() {
@@ -295,9 +319,222 @@
       .then(function (json) { dataCache[name] = json; return json; });
   }
 
-  /** Gemini 호출. 재시도 사다리와 JSON 방어선은 다음 작업에서 이식. */
-  function callGemini(prompt, options) {   // eslint-disable-line no-unused-vars
-    return Promise.reject(new Error('생성 기능은 아직 연결되지 않았습니다.'));
+  /* ------------------------------------------------------------
+   * Gemini 계층
+   *   호출 사다리 : 기본 모델 → (429·503) 5초 뒤 1회 재시도 → 폴백 모델
+   *   JSON 방어선 : ① 형식 규칙 자동 첨부 ② 따옴표 무손실 수선
+   *                 ③ 절단 복구 → 그래도 안 되면 같은 요청 1회 재시도
+   * ------------------------------------------------------------ */
+  var GEMINI = {
+    model: 'gemini-3.5-flash',
+    fallback: 'gemini-3.1-flash-lite',
+    version: 'v1beta',
+    temperature: 0.7,
+    maxTokens: 8192
+  };
+
+  // 모든 프롬프트 끝에 붙는다 — JSON 문자열 안 큰따옴표가 깨짐의 주범이라 원천 차단한다.
+  var JSON_RULE = '\n[형식 규칙] JSON 문자열 값 안에 큰따옴표(")를 절대 쓰지 마. ' +
+                  '인용·대사·강조가 필요하면 작은따옴표나 낫표(『 』)를 사용해.';
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function msgOf(e) { return (e && e.message) ? e.message : String(e || ''); }
+  function isQuota(e) { return msgOf(e).indexOf('QUOTA_') === 0; }
+  function isOverload(e) { return msgOf(e).indexOf('OVERLOADED') === 0; }
+  function isParseFail(e) { return msgOf(e).indexOf('JSON 파싱 실패') === 0; }
+  function isDailyBody(b) { return /per\s*day|perday|daily/i.test(String(b || '')); }
+
+  function geminiUrl(model, key) {
+    return 'https://generativelanguage.googleapis.com/' + GEMINI.version +
+           '/models/' + model + ':generateContent?key=' + encodeURIComponent(key);
+  }
+
+  function postGemini(url, payload) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      return res.text().then(function (body) { return { code: res.status, body: body }; });
+    }, function () {
+      throw new Error('인터넷 연결이 끊겼거나 Gemini에 닿지 못했습니다. 연결을 확인하고 다시 눌러 주세요.');
+    });
+  }
+
+  function extractText(data) {
+    if (!data || !data.candidates || !data.candidates.length) return '';
+    var c = data.candidates[0];
+    if (!c.content || !c.content.parts) return '';
+    var out = '';
+    c.content.parts.forEach(function (p) { if (p.text) out += p.text; });
+    return out;
+  }
+
+  function callModel(model, prompt, schema) {
+    var key = getApiKey();
+    if (!key) return Promise.reject(new Error('먼저 오른쪽 위에서 API 키를 등록해 주세요.'));
+
+    var url = geminiUrl(model, key);
+    var cfg = {
+      responseMimeType: 'application/json',
+      temperature: GEMINI.temperature,
+      maxOutputTokens: GEMINI.maxTokens
+    };
+    if (schema) cfg.responseSchema = schema;
+    var payload = { contents: [{ parts: [{ text: prompt + JSON_RULE }] }], generationConfig: cfg };
+
+    return postGemini(url, payload).then(function (r) {
+      // 순간 몰림(분당 429)·일시 혼잡(503)은 5초 쉬고 한 번만 자동 재시도
+      if ((r.code === 429 && !isDailyBody(r.body)) || r.code === 503) {
+        return sleep(5000).then(function () { return postGemini(url, payload); });
+      }
+      return r;
+    }).then(function (r) {
+      if (r.code === 429) throw new Error((isDailyBody(r.body) ? 'QUOTA_DAILY' : 'QUOTA_MINUTE') + ' (' + model + ')');
+      if (r.code === 503) throw new Error('OVERLOADED (' + model + ')');
+      if (r.code === 400 || r.code === 403) {
+        throw new Error('API 키가 거부되었습니다. 오른쪽 위에서 키를 다시 등록해 주세요.');
+      }
+      if (r.code !== 200) {
+        throw new Error('Gemini 오류 (HTTP ' + r.code + '): ' + String(r.body || '').substring(0, 400));
+      }
+
+      var data = JSON.parse(r.body);
+      var text = extractText(data);
+      if (!text) {
+        var why = '';
+        if (data.candidates && data.candidates[0] && data.candidates[0].finishReason) {
+          why = ' (중단 사유: ' + data.candidates[0].finishReason + ')';
+        } else if (data.promptFeedback && data.promptFeedback.blockReason) {
+          why = ' (차단 사유: ' + data.promptFeedback.blockReason + ')';
+        }
+        throw new Error('Gemini가 빈 응답을 보냈습니다' + why + '. 다시 눌러 주세요.');
+      }
+
+      try { return parseJson(text); }
+      catch (pe) {
+        var fixed = repairJson(text);
+        if (fixed !== null) return fixed;   // 잘린 꼬리를 정리해 온전한 부분까지 살린다
+        throw pe;
+      }
+    });
+  }
+
+  function callLadder(prompt, schema) {
+    return callModel(GEMINI.model, prompt, schema)['catch'](function (e) {
+      if (!isQuota(e) && !isOverload(e)) throw e;
+      return callModel(GEMINI.fallback, prompt, schema)['catch'](function (e2) {
+        if (isQuota(e2)) {
+          if ((msgOf(e) + ' ' + msgOf(e2)).indexOf('QUOTA_MINUTE') !== -1) {
+            throw new Error('요청이 잠깐 몰렸습니다(분당 한도). 1분쯤 뒤에 같은 버튼을 다시 눌러 주세요. 작성한 내용은 저장되어 있습니다.');
+          }
+          throw new Error('오늘 치 무료 호출 한도를 다 썼습니다. 한국 시간 오후 4시쯤 다시 채워집니다. 작성한 내용은 저장되어 있습니다.');
+        }
+        if (isOverload(e2)) {
+          throw new Error('Gemini 서버가 혼잡합니다. 잠시 뒤 같은 버튼을 다시 눌러 주세요. 작성한 내용은 저장되어 있습니다.');
+        }
+        throw e2;
+      });
+    });
+  }
+
+  /** 생성 요청 입구. 형식이 어긋나면 같은 요청을 딱 한 번 다시 보낸다. */
+  function callGemini(prompt, schema) {
+    return callLadder(prompt, schema)['catch'](function (e) {
+      if (isParseFail(e)) return callLadder(prompt, schema);
+      throw e;
+    });
+  }
+
+  /* ---- JSON 방어선 ---- */
+  function stripFence(t) {
+    return String(t).trim()
+      .replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+  }
+
+  function parseJson(text) {
+    var t = stripFence(text);
+    try { return JSON.parse(t); }
+    catch (e) {
+      throw new Error('JSON 파싱 실패: ' + e + '\n원문(앞 400자): ' + t.substring(0, 400));
+    }
+  }
+
+  /** 문자열 값 안의 이스케이프 안 된 따옴표를 살려 낸다(무손실 수선). */
+  function fixQuotes(t) {
+    var out = '', inStr = false, esc = false;
+    for (var i = 0; i < t.length; i++) {
+      var c = t.charAt(i);
+      if (!inStr) { if (c === '"') inStr = true; out += c; continue; }
+      if (esc) { esc = false; out += c; continue; }
+      if (c === '\\') { esc = true; out += c; continue; }
+      if (c === '"') {
+        var j = i + 1;
+        while (j < t.length && /\s/.test(t.charAt(j))) j++;
+        var nx = j < t.length ? t.charAt(j) : '';
+        if (nx === ',' || nx === '}' || nx === ']' || nx === ':' || nx === '') { inStr = false; out += c; }
+        else { out += '\\"'; }
+        continue;
+      }
+      out += c;
+    }
+    return out;
+  }
+
+  /** 열린 괄호를 세어 닫아 준다. 구조가 어긋나면 null. */
+  function closeBrackets(s) {
+    var stack = [], inStr = false, esc = false;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (inStr) {
+        if (esc) esc = false;
+        else if (c === '\\') esc = true;
+        else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') inStr = true;
+      else if (c === '{' || c === '[') stack.push(c);
+      else if (c === '}') { if (stack.pop() !== '{') return null; }
+      else if (c === ']') { if (stack.pop() !== '[') return null; }
+    }
+    if (inStr) return null;
+    var tail = '';
+    for (var j = stack.length - 1; j >= 0; j--) tail += (stack[j] === '{' ? '}' : ']');
+    return s + tail;
+  }
+
+  /** 끝이 잘린 응답에서 온전한 부분까지 살린다. 너무 많이 잃으면 포기하고 재시도에 맡긴다. */
+  function repairJson(text) {
+    var t = stripFence(text);
+    try { return JSON.parse(fixQuotes(t)); } catch (e0) { /* 다음 수단으로 */ }
+    var tries = 0;
+    for (var cut = t.length; cut > 1 && tries < 400; cut--) {
+      var ch = t.charAt(cut - 1);
+      if (ch !== '}' && ch !== ']') continue;   // 완결된 경계에서만 자른다
+      tries++;
+      var closed = closeBrackets(t.substring(0, cut).replace(/,\s*$/, ''));
+      if (closed === null) continue;
+      try {
+        var obj = JSON.parse(closed);
+        if (JSON.stringify(obj).length < t.length * 0.6) return null;
+        return obj;
+      } catch (e) { /* 다음 절단점 */ }
+    }
+    return null;
+  }
+
+  /** 키가 살아 있는지 가볍게 확인한다. 'ok' | 'quota' | 'invalid' */
+  function verifyApiKey(key) {
+    var url = geminiUrl(GEMINI.fallback, key);
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }], generationConfig: { maxOutputTokens: 1 } })
+    }).then(function (res) {
+      if (res.status === 200) return 'ok';
+      if (res.status === 429 || res.status === 503) return 'quota';
+      return 'invalid';
+    }, function () { return 'network'; });
   }
 
   /** 워드 내보내기. 경기도 실습 틀 구조로 다음 작업에서 구현. */
@@ -674,9 +911,96 @@
       updateCounts();
     }
 
+    function themeName(id) {
+      var hit = null;
+      ((fw && fw.transdisciplinaryThemes) || []).forEach(function (t) { if (t.id === id) hit = t; });
+      return hit;
+    }
+
+    /** 후보를 뽑을 성취기준 풀 — 통합교과 단원 것은 이미 담겨 있으므로 추가 교과 위주로 본다. */
+    function candidatePool() {
+      var subs = state.grade <= 2 ? extraSubjects() : (state.subjects || []);
+      var out = [];
+      subs.forEach(function (name) {
+        subjectStandards(name).forEach(function (o) { out.push(o); });
+      });
+      return out;
+    }
+
+    function buildPrompt() {
+      var t = themeName(state.theme) || {};
+      var lines = candidatePool().map(function (o) {
+        return '- ' + o.code + ' [' + o.subject + '·' + o.domain + '] ' + o.text;
+      });
+      var already = (state.standards || []).map(function (o) {
+        return '- ' + o.code + ' ' + o.text;
+      });
+
+      var p = '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+              '[학년] ' + state.grade + '학년\n' +
+              '[초학문적 주제] ' + (t.ko || '') + ' (' + (t.en || '') + ')\n' +
+              '[주제 설명]\n' + ((t.descriptors || []).map(function (d) { return '- ' + d; }).join('\n')) + '\n\n';
+
+      if (state.grade <= 2 && state.tonghapUnit) {
+        p += '[통합교과 단원] ' + state.tonghapUnit.unit + ' — ' +
+             String(state.tonghapUnit.bigIdea).replace(/^[0-9-]+\.\s*/, '') + '\n\n';
+      }
+      if (already.length) {
+        p += '[이미 고른 성취기준]\n' + already.join('\n') + '\n\n';
+      }
+      p += '[고를 수 있는 성취기준 목록]\n' + lines.join('\n') + '\n\n' +
+           '[할 일]\n' +
+           '위 목록에서 이 초학문적 주제의 탐구에 실제로 기여하는 성취기준을 4개에서 6개 고른다.\n' +
+           '- 반드시 목록에 있는 코드만 쓴다. 목록에 없는 코드를 지어내지 않는다.\n' +
+           '- 이미 고른 성취기준과 겹치지 않게 한다.\n' +
+           '- 교과가 한쪽으로 쏠리지 않게 두 교과 이상에서 고른다.\n' +
+           '- 이유는 한 문장으로, 이 주제의 탐구와 어떻게 이어지는지 쓴다.\n\n' +
+           '[출력] 다음 형태의 JSON만 출력한다.\n' +
+           '{ "picks": [ { "code": "성취기준 코드", "why": "고른 이유 한 문장" } ] }';
+      return p;
+    }
+
+    function applyPicks(picks) {
+      var pooled = candidatePool();
+      var added = 0, unknown = 0;
+      (picks || []).forEach(function (p) {
+        var code = String(p && p.code || '').trim();
+        var hit = null;
+        pooled.forEach(function (o) { if (o.code === code) hit = o; });
+        if (!hit) { unknown++; return; }
+        if (hasStd(code)) return;
+        hit.why = String(p.why || '');
+        addStd(hit);
+        added++;
+      });
+      return { added: added, unknown: unknown };
+    }
+
     function askAi() {
       if (!state.theme) { msg('먼저 초학문적 주제를 골라 주세요.', 'warn'); return; }
-      msg('추천 기능은 다음 작업에서 연결합니다. 지금은 목록에서 직접 골라 주세요.', 'warn');
+      if (!candidatePool().length) {
+        msg(state.grade <= 2
+          ? '추천할 목록이 없습니다. 위에서 국어나 수학을 더해 주세요.'
+          : '추천할 목록이 없습니다. 교과를 먼저 골라 주세요.', 'warn');
+        return;
+      }
+      var btn = $('#s1-std [data-act="ai"]');
+      if (btn) { btn.disabled = true; btn.textContent = '추천을 받는 중…'; }
+      msg('주제와 성취기준을 견주어 보는 중입니다. 10초쯤 걸립니다.', 'info');
+
+      callGemini(buildPrompt()).then(function (res) {
+        var r = applyPicks(res && res.picks);
+        paintAll();
+        if (r.added === 0) {
+          msg('새로 더할 만한 성취기준을 찾지 못했습니다. 목록에서 직접 골라 주세요.', 'warn');
+        } else {
+          msg('성취기준 ' + r.added + '개를 담았습니다. 목록에서 확인하고 필요 없는 것은 체크를 풀어 주세요.' +
+              (r.unknown ? ' (알아볼 수 없는 코드 ' + r.unknown + '개는 건너뛰었습니다.)' : ''), 'info');
+        }
+      })['catch'](function (e) {
+        paintAll();
+        msg(msgOf(e), 'stop');
+      });
     }
 
     /* ---- 연결 ---- */
