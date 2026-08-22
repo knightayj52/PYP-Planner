@@ -412,6 +412,66 @@ html[data-theme="dark"] .chip[aria-pressed="true"]{color:#0C1512}
 .count{font-size:14px;color:var(--ink-3);font-weight:600}
 .count strong{color:var(--pine-ink)}
 
+/* ---- 2단계: 중심 아이디어 ---- */
+.anchor{
+  border-left:3px solid var(--pine);
+  background:var(--pine-wash);
+  border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  padding:11px 15px;margin-bottom:9px;
+}
+.anchor__src{font-size:12.5px;font-weight:700;color:var(--pine-ink);margin-bottom:3px}
+.anchor__text{font-size:14.5px;color:var(--ink-2);line-height:1.55}
+
+.cand{
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:15px 17px;margin-bottom:10px;
+  cursor:pointer;display:block;width:100%;text-align:left;
+}
+.cand:hover{border-color:var(--ink-3)}
+.cand[aria-pressed="true"]{border-color:var(--pine);box-shadow:inset 0 0 0 1px var(--pine)}
+.cand__text{font-size:16px;font-weight:600;line-height:1.55;margin-bottom:9px}
+.cand__note{font-size:13.5px;color:var(--ink-3);line-height:1.5;margin-bottom:9px}
+.ercs{display:flex;flex-wrap:wrap;gap:6px}
+.ercs__item{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:12.5px;font-weight:600;
+  padding:2px 9px;border-radius:99px;
+  border:1px solid var(--line);color:var(--ink-3);
+}
+.ercs__item[data-v="yes"]{border-color:color-mix(in srgb,var(--pine) 45%,transparent);background:var(--pine-wash);color:var(--pine-ink)}
+.ercs__item[data-v="weak"]{border-color:color-mix(in srgb,var(--warn) 45%,transparent);background:var(--warn-wash);color:var(--warn)}
+
+.check{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:11px 14px;border:1px solid var(--line);
+  border-radius:var(--radius-sm);background:var(--surface);
+  margin-bottom:7px;cursor:pointer;
+}
+.check input{flex:none;width:17px;height:17px;margin:2px 0 0;accent-color:var(--pine)}
+.check__name{font-weight:700;font-size:14.5px}
+.check__q{font-size:13.5px;color:var(--ink-3);line-height:1.5}
+.check__ai{
+  display:block;margin-top:5px;font-size:13px;line-height:1.5;
+  color:var(--ink-2);
+  padding-left:10px;border-left:2px solid var(--line);
+}
+
+.editor{
+  width:100%;min-height:88px;padding:12px 14px;
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-size:16px;line-height:1.6;resize:vertical;
+}
+.editor:focus{outline:2px solid var(--pine);border-color:var(--pine)}
+.formcheck{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.formcheck span{
+  font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;
+  border:1px solid var(--line);color:var(--ink-3);
+}
+.formcheck span[data-ok="true"]{border-color:color-mix(in srgb,var(--pine) 45%,transparent);color:var(--pine-ink);background:var(--pine-wash)}
+.formcheck span[data-ok="false"]{border-color:color-mix(in srgb,var(--alert) 45%,transparent);color:var(--alert);background:var(--alert-wash)}
+
 /* ============================================================
    반응형
    ============================================================ */
@@ -552,7 +612,10 @@ html[data-theme="dark"] .chip[aria-pressed="true"]{color:#0C1512}
         <h2 class="step__title" id="t2">중심 아이디어 쓰기</h2>
         <p class="step__hint">2022 개정 교육과정의 핵심 아이디어를 먼저 확인하고, 그것을 근거로 삼은 중심 아이디어 후보 세 개를 받아 고릅니다. 고른 문장은 ERCS 기준으로 스스로 점검합니다.</p>
       </div>
-      <div class="placeholder"><strong>핵심 아이디어 카드 · 중심 아이디어 후보 · 자가 점검</strong>다음 작업에서 채웁니다.</div>
+      <div class="block" id="s2-anchor"></div>
+      <div class="block" id="s2-cand"></div>
+      <div class="block" id="s2-edit"></div>
+      <div class="block" id="s2-ercs"></div>
     </section>
 
     <section class="step" id="step-3" data-step="3" aria-labelledby="t3">
