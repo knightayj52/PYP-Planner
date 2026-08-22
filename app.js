@@ -2356,6 +2356,14 @@
       var a = state.assessment;
       if (!a.criteria) a.criteria = { knowledge: '', understanding: '', skills: '' };
       if (!a.frameData) a.frameData = {};
+      // 형성평가는 탐구 목록마다 하나씩 둔다. 예전에 한 덩이로 저장된 것은 첫 칸으로 옮긴다.
+      if (typeof a.formative === 'string') {
+        a.formative = a.formative ? [a.formative] : [];
+      }
+      if (!Array.isArray(a.formative)) a.formative = [];
+      var n = loi().length;
+      while (a.formative.length < n) a.formative.push('');
+      if (a.formative.length > n) a.formative.length = Math.max(n, 1);
       return a;
     }
     function koOf(id) {
@@ -2393,15 +2401,29 @@
       var a = A();
       var h = '<h3 class="block__title"><span class="block__ord">2</span>세 가지 평가</h3>' +
               '<p class="block__hint">언제 어떻게 볼지를 적습니다. 총괄평가는 아래에서 틀로 펼칠 수 있습니다.</p>';
+      var lines = loi();
       THREE.forEach(function (t) {
         h += '<div class="asm"><div class="asm__head">' +
              '<span class="asm__ko">' + esc(t.ko) + '</span>' +
              '<span class="asm__when">' + esc(t.when) + '</span></div>' +
-             '<p class="asm__why">' + esc(t.why) + '</p>' +
-             '<textarea class="asm__in" data-act="asm" data-k="' + t.id + '" ' +
-             'placeholder="' + esc(t.ko) + ' 계획">' + esc(a[t.id] || '') + '</textarea></div>';
+             '<p class="asm__why">' + esc(t.why) + '</p>';
+
+        if (t.id === 'formative' && lines.length) {
+          lines.forEach(function (l, i) {
+            h += '<div class="asm__sub"><p class="asm__loi">' +
+                 '<span class="asm__num">' + (i + 1) + '</span>' + esc(l.text) + '</p>' +
+                 '<textarea class="asm__in" data-act="fmv" data-i="' + i + '" ' +
+                 'placeholder="이 갈래를 탐구하는 동안 무엇으로 확인할지">' +
+                 esc(a.formative[i] || '') + '</textarea></div>';
+          });
+        } else {
+          h += '<textarea class="asm__in" data-act="asm" data-k="' + t.id + '" ' +
+               'placeholder="' + esc(t.ko) + ' 계획">' + esc(a[t.id] || '') + '</textarea>';
+        }
+        h += '</div>';
       });
       $('#s6-three').innerHTML = h;
+      grow($('#s6-three'));
     }
 
     function paintFrame() {
@@ -2434,6 +2456,16 @@
              'placeholder="' + esc(sl.hint) + '">' + esc((a.frameData || {})[sl.id] || '') + '</textarea></div>';
       });
       $('#s6-frame').innerHTML = h;
+      grow($('#s6-frame'));
+    }
+
+    /** 글 내용에 맞춰 입력칸 높이를 늘린다. 스크롤이 생기지 않게 한다. */
+    function grow(root) {
+      if (!root) return;
+      $$('textarea', root).forEach(function (el) {
+        el.style.height = 'auto';
+        el.style.height = Math.max(el.offsetHeight, el.scrollHeight + 2) + 'px';
+      });
     }
 
     function paintCrit() {
@@ -2448,6 +2480,7 @@
              'placeholder="' + esc(c.ko) + ' 도달 기준">' + esc(a.criteria[c.id] || '') + '</textarea></div>';
       });
       $('#s6-crit').innerHTML = h + '</div>';
+      grow($('#s6-crit'));
     }
 
     function paintAll() {
@@ -2477,8 +2510,9 @@
              '[할 일] 이 단원의 평가를 마련한다.\n' +
              '- 진단평가: 단원을 열 때 학생이 이미 아는 것과 오개념을 살피는 방법. ' +
              '점수를 매기는 시험이 아니라 드러내 보이게 하는 활동으로 쓴다.\n' +
-             '- 형성평가: 탐구가 흘러가는 동안 이해가 어디쯤 왔는지 확인하는 방법. ' +
-             '탐구 목록의 진행과 맞물리게 쓴다.\n' +
+             '- 형성평가: 탐구 목록 하나마다 하나씩, 모두 ' + loi().length + '개를 쓴다. ' +
+             '그 갈래를 탐구하는 동안 이해가 어디쯤 왔는지 확인하는 방법을 쓴다. ' +
+             '배열의 순서는 위 탐구 목록 순서와 같게 한다.\n' +
              '- 총괄평가: 중심 아이디어에 이르렀는지를 학생이 드러내 보이는 과제. ' +
              '단순 지식 확인이 아니라 배운 것을 새로운 상황에 써 보게 하는 과제로 쓴다.\n' +
              '- 도달 기준: 지식(무엇을 알게 되는가), 이해(무엇을 이해하게 되는가), ' +
@@ -2489,7 +2523,8 @@
              '- 평서형 종결어미(-다)로 끝낸다. 존댓말 어미를 쓰지 않는다.\n' +
              '- 고유명사와 특정 지명·인명을 넣지 않는다.\n\n' +
              '[출력] 다음 형태의 JSON만 출력한다.\n' +
-             '{ "diagnostic": "진단평가", "formative": "형성평가", "summative": "총괄평가", ' +
+             '{ "diagnostic": "진단평가", "formative": ["첫째 갈래 형성평가", "둘째 갈래 형성평가"], ' +
+             '"summative": "총괄평가", ' +
              '"criteria": { "knowledge": "지식", "understanding": "이해", "skills": "기능" } }';
     }
 
@@ -2502,8 +2537,19 @@
       callGemini(buildPrompt()).then(function (res) {
         var a = A();
         a.diagnostic = String((res && res.diagnostic) || '').trim();
-        a.formative = String((res && res.formative) || '').trim();
         a.summative = String((res && res.summative) || '').trim();
+
+        var fv = res && res.formative;
+        var n = Math.max(loi().length, 1);
+        var list = [];
+        if (Array.isArray(fv)) {
+          fv.forEach(function (x) { list.push(String(x || '').trim()); });
+        } else if (fv) {
+          list.push(String(fv).trim());   // 한 덩이로 오면 첫 칸에 담는다
+        }
+        while (list.length < n) list.push('');
+        list.length = n;
+        a.formative = list;
         var c = (res && res.criteria) || {};
         a.criteria = {
           knowledge: String(c.knowledge || '').trim(),
@@ -2536,7 +2582,9 @@
              '조건:\n' +
              '- 지금의 총괄평가에서 벗어나지 않는다. 같은 과제를 틀에 맞춰 또렷하게 하는 것이다.\n' +
              '- ' + state.grade + '학년 학생이 읽고 무엇을 할지 알 수 있는 말로 쓴다.\n' +
-             '- 각 칸은 한두 문장으로 짧게 쓴다.\n' +
+             '- 각 칸은 한 문장 안팎으로 짧게 쓴다. 두 문장을 넘기지 않는다.\n' +
+             '- 평서형으로 끝낸다. 존댓말 어미(-입니다, -합니다, -것입니다)를 쓰지 않는다. ' +
+             '역할·청중·산출물처럼 이름을 적는 칸은 명사구로 끝내도 좋다.\n' +
              '- 고유명사와 실제 기관·인물 이름을 넣지 않는다. 역할과 청중은 일반적인 말로 쓴다.\n\n' +
              '[출력] 다음 형태의 JSON만 출력한다. 위 칸 이름을 그대로 쓴다.\n' +
              '{ ' + f.slots.map(function (sl) { return '"' + sl.id + '": "내용"'; }).join(', ') + ' }';
@@ -2580,7 +2628,7 @@
         if (v) parts.push(sl.ko + ': ' + v);
       });
       if (!parts.length) { msg('#s6-fmsg', '먼저 칸을 채워 주세요.', 'warn'); return; }
-      a.summative = '[' + f.ko + '] ' + parts.join(' / ');
+      a.summative = '[' + f.ko + ']\n' + parts.join('\n');
       paintAll();
       msg('#s6-fmsg', '총괄평가 칸에 옮겼습니다. 위에서 다듬어 주세요.', 'info');
     }
@@ -2613,8 +2661,13 @@
         var a = A();
         var k = t.getAttribute('data-k');
         if (t.matches('[data-act="asm"]')) { a[k] = t.value; saveDraft(); }
+        else if (t.matches('[data-act="fmv"]')) { a.formative[Number(t.getAttribute('data-i'))] = t.value; saveDraft(); }
         else if (t.matches('[data-act="crit"]')) { a.criteria[k] = t.value; saveDraft(); }
         else if (t.matches('[data-act="slot"]')) { a.frameData[k] = t.value; saveDraft(); }
+        else return;
+        // 쓰는 동안 칸이 함께 늘어나 스크롤이 생기지 않게 한다
+        t.style.height = 'auto';
+        t.style.height = (t.scrollHeight + 2) + 'px';
       });
     }
 
@@ -2629,8 +2682,15 @@
       if (!hard.length) {
         var miss = [];
         if (!t(a.diagnostic)) miss.push('진단평가');
-        if (!t(a.formative)) miss.push('형성평가');
+        var fv = Array.isArray(a.formative) ? a.formative : (a.formative ? [a.formative] : []);
+        var lines = (st.linesOfInquiry || []).filter(function (l) { return t(l.text); });
+        if (!fv.some(function (x) { return t(x); })) miss.push('형성평가');
         if (miss.length) soft.push(miss.join(' · ') + ' 칸이 비어 있습니다.');
+        else {
+          var gaps = [];
+          lines.forEach(function (l, i) { if (!t(fv[i])) gaps.push(i + 1); });
+          if (gaps.length) soft.push('탐구 목록 ' + gaps.join(' · ') + '번의 형성평가가 비어 있습니다.');
+        }
 
         var cm = [];
         if (!t(c.knowledge)) cm.push('지식');
