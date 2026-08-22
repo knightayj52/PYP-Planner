@@ -577,12 +577,18 @@
     function extraSubjects() {
       return (state.subjects || []).filter(function (n) { return !isTonghapName(n); });
     }
+    /** 코드 비교용 정규화 — AI가 대괄호를 빼거나 공백을 넣어도 같은 것으로 본다. */
+    function normCode(c) {
+      return String(c == null ? '' : c).replace(/[\[\]\s·．.]/g, '').toUpperCase();
+    }
     function hasStd(code) {
-      return (state.standards || []).some(function (x) { return x.code === code; });
+      var k = normCode(code);
+      return (state.standards || []).some(function (x) { return normCode(x.code) === k; });
     }
     function addStd(o) { if (!hasStd(o.code)) state.standards.push(o); }
     function dropStd(code) {
-      state.standards = (state.standards || []).filter(function (x) { return x.code !== code; });
+      var k = normCode(code);
+      state.standards = (state.standards || []).filter(function (x) { return normCode(x.code) !== k; });
     }
     function msg(text, tone) {
       var el = $('#s1-msg');
@@ -895,16 +901,17 @@
 
     function toggleStd(code, on) {
       if (!on) { dropStd(code); updateCounts(); return; }
+      var k = normCode(code);
       var found = null;
       if (state.grade <= 2 && state.tonghapUnit) {
         var u = findUnit(state.tonghapUnit.unit);
         (u && u.standards || []).forEach(function (r) {
-          if (r.code === code) found = fromUnit(r, u.unit);
+          if (normCode(r.code) === k) found = fromUnit(r, u.unit);
         });
       }
       if (!found) {
         ((pool && pool.standards) || []).forEach(function (r) {
-          if (r.code === code) found = fromPool(r);
+          if (normCode(r.code) === k) found = fromPool(r);
         });
       }
       if (found) addStd(found);
@@ -956,24 +963,27 @@
            '- 교과가 한쪽으로 쏠리지 않게 두 교과 이상에서 고른다.\n' +
            '- 이유는 한 문장으로, 이 주제의 탐구와 어떻게 이어지는지 쓴다.\n\n' +
            '[출력] 다음 형태의 JSON만 출력한다.\n' +
-           '{ "picks": [ { "code": "성취기준 코드", "why": "고른 이유 한 문장" } ] }';
+           '{ "picks": [ { "code": "[4사01-01]", "why": "고른 이유 한 문장" } ] }\n' +
+           'code는 위 목록에 적힌 그대로, 대괄호까지 포함해 옮겨 적는다.';
       return p;
     }
 
     function applyPicks(picks) {
       var pooled = candidatePool();
-      var added = 0, unknown = 0;
+      var index = {};
+      pooled.forEach(function (o) { index[normCode(o.code)] = o; });
+
+      var added = 0, unknown = 0, dup = 0, missed = [];
       (picks || []).forEach(function (p) {
-        var code = String(p && p.code || '').trim();
-        var hit = null;
-        pooled.forEach(function (o) { if (o.code === code) hit = o; });
-        if (!hit) { unknown++; return; }
-        if (hasStd(code)) return;
-        hit.why = String(p.why || '');
+        var raw = String((p && p.code) || '').trim();
+        var hit = index[normCode(raw)];
+        if (!hit) { unknown++; if (missed.length < 3) missed.push(raw); return; }
+        if (hasStd(hit.code)) { dup++; return; }
+        hit.why = String((p && p.why) || '');
         addStd(hit);
         added++;
       });
-      return { added: added, unknown: unknown };
+      return { added: added, unknown: unknown, dup: dup, missed: missed, asked: (picks || []).length };
     }
 
     function askAi() {
@@ -991,11 +1001,15 @@
       callGemini(buildPrompt()).then(function (res) {
         var r = applyPicks(res && res.picks);
         paintAll();
-        if (r.added === 0) {
-          msg('새로 더할 만한 성취기준을 찾지 못했습니다. 목록에서 직접 골라 주세요.', 'warn');
-        } else {
+        if (r.added > 0) {
           msg('성취기준 ' + r.added + '개를 담았습니다. 목록에서 확인하고 필요 없는 것은 체크를 풀어 주세요.' +
-              (r.unknown ? ' (알아볼 수 없는 코드 ' + r.unknown + '개는 건너뛰었습니다.)' : ''), 'info');
+              (r.unknown ? ' (목록에 없는 코드 ' + r.unknown + '개는 건너뛰었습니다.)' : ''), 'info');
+        } else if (r.dup > 0) {
+          msg('추천받은 ' + r.dup + '개가 이미 골라 둔 것과 같습니다. 다른 성취기준이 필요하면 목록에서 직접 골라 주세요.', 'warn');
+        } else if (r.unknown > 0) {
+          msg('추천받은 코드를 목록에서 찾지 못했습니다(' + r.missed.join(', ') + '). 다시 한 번 눌러 주시고, 계속 같으면 알려 주세요.', 'stop');
+        } else {
+          msg('추천이 비어 있습니다. 다시 한 번 눌러 주세요.', 'warn');
         }
       })['catch'](function (e) {
         paintAll();
