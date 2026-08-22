@@ -50,6 +50,7 @@
 
     keyConcepts: [],            // 3
     relatedConcepts: [],
+    conceptReview: null,        // 교사가 고른 뒤 AI가 짚어준 검토 의견 (참고용)
 
     linesOfInquiry: [],         // 4  [{ text, concepts:[] }]
 
@@ -184,6 +185,7 @@
     saveDraft();
     renderStep({ scroll: true });
     if (state.step === 2 && typeof S2 !== 'undefined') S2.repaint();
+    if (state.step === 3 && typeof S3 !== 'undefined') S3.repaint();
   }
 
   /* ============================================================
@@ -1081,6 +1083,7 @@
    * ============================================================ */
   var S2 = (function () {
     var fw = null, core = null, cands = [];
+    var hadIdea = false;   // 편집칸이 비었다가 채워지는 순간을 잡아 점검 항목을 띄운다
 
     function esc(v) {
       return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
@@ -1170,6 +1173,7 @@
              ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
              '<span class="cand__text">' + esc(c.text) + '</span>';
         if (c.note) h += '<span class="cand__note">' + esc(c.note) + '</span>';
+        // 아래 ercs 딱지는 별도 줄로 이어진다
         if (c.ercs) {
           h += '<span class="ercs">';
           ercsItems().forEach(function (it) {
@@ -1190,7 +1194,9 @@
         one: v.length > 0 && !/[.!?。]\s*\S/.test(v),
         // 한국어 과거형은 '았다·었다·였다'로 끝난다. 미래·추측형도 함께 걸러 낸다.
         present: !/((았|었|였)다|할 것이다|일 것이다|겠다)\s*[.。]?\s*$/.test(v),
-        noProper: !/[A-Z][a-zA-Z]{2,}/.test(v)
+        noProper: !/[A-Z][a-zA-Z]{2,}/.test(v),
+        // 게시물·문서에 그대로 실리므로 존댓말 어미는 걸러 낸다.
+        plain: !/(습니다|입니다|됩니다|합니다|칩니다|갑니다|니다)\s*[.。]?\s*$/.test(v)
       };
     }
 
@@ -1205,6 +1211,7 @@
               '<span data-ok="' + (t ? f.one : '') + '">한 문장</span>' +
               '<span data-ok="' + (t ? f.present : '') + '">현재 시제</span>' +
               '<span data-ok="' + (t ? f.noProper : '') + '">고유명사 없음</span>' +
+              '<span data-ok="' + (t ? f.plain : '') + '">평서형(-다)</span>' +
               '</div>';
       $('#s2-edit').innerHTML = h;
     }
@@ -1232,6 +1239,7 @@
 
     function paintAll() {
       if (!fw || !core) return;
+      hadIdea = !!String(state.centralIdea || '').trim();
       paintAnchor(); paintCand(); paintEdit(); paintErcs();
       saveDraft();
     }
@@ -1261,6 +1269,7 @@
            '중심 아이디어의 조건:\n' +
            '- 개념과 개념의 관계를 담은 한 문장으로 쓴다.\n' +
            '- 현재 시제로 쓴다. 고유명사와 특정 지명·인명을 넣지 않는다.\n' +
+           '- 평서형 종결어미로 끝낸다(-다). 존댓말 어미(-습니다, -됩니다, -합니다)를 쓰지 않는다.\n' +
            '- ' + state.grade + '학년 학생이 읽고 뜻을 짐작할 수 있는 낱말로 쓴다.\n' +
            '- 사실 하나를 말하는 문장이 아니라, 여러 사례에 걸쳐 통하는 문장으로 쓴다.\n' +
            '- 세 후보는 서로 다른 개념 축을 잡는다. 표현만 바꾼 문장을 내지 않는다.\n\n' +
@@ -1271,7 +1280,8 @@
            '- significant: 이 초학문적 주제를 깊이 이해하는 데 핵심인가\n' +
            'false로 둔 항목이 있으면 comment에 무엇이 아쉬운지 한 문장으로 적는다.\n\n' +
            '[출력] 다음 형태의 JSON만 출력한다.\n' +
-           '{ "candidates": [ { "text": "중심 아이디어 한 문장", "note": "어떤 개념 축을 잡았는지 한 문장", ' +
+           '{ "candidates": [ { "text": "사람들은 가진 것이 한정되어 있어 무엇을 먼저 할지 선택한다.", ' +
+           '"note": "어떤 개념 축을 잡았는지 한 문장", ' +
            '"ercs": { "engaging": true, "relevant": true, "challenging": false, "significant": true }, ' +
            '"comment": { "challenging": "아쉬운 점 한 문장" } } ] }';
       return p;
@@ -1341,11 +1351,15 @@
           state.centralIdea = ev.target.value;
           var f = formChecks(state.centralIdea);
           var tags = $$('#s2-edit .formcheck span');
-          if (tags.length === 3 && state.centralIdea.trim()) {
+          if (tags.length === 4 && state.centralIdea.trim()) {
             tags[0].setAttribute('data-ok', String(f.one));
             tags[1].setAttribute('data-ok', String(f.present));
             tags[2].setAttribute('data-ok', String(f.noProper));
+            tags[3].setAttribute('data-ok', String(f.plain));
           }
+          // 후보를 고르지 않고 직접 써 넣은 경우에도 네 가지 점검이 뜨도록 한다
+          var has = !!state.centralIdea.trim();
+          if (has !== hadIdea) { hadIdea = has; paintErcs(); }
           saveDraft();
         }
       });
@@ -1362,6 +1376,9 @@
         if (!f.noProper) hard.push('중심 아이디어에는 고유명사를 넣지 않습니다.');
       }
       if (!hard.length) {
+        if (!formChecks(t).plain) {
+          soft.push('중심 아이디어가 존댓말로 끝납니다. 보통은 평서형(-다)으로 씁니다.');
+        }
         var off = [];
         ercsItems().forEach(function (it) { if (!(st.ercs && st.ercs[it.id])) off.push(it.ko); });
         if (off.length) soft.push('네 가지 가운데 ' + off.join(' · ') + ' 항목에 체크가 없습니다.');
@@ -1371,6 +1388,302 @@
 
     function init() {
       bindStep2();
+      ensure().then(paintAll)['catch'](function () { /* 데이터가 없으면 조용히 넘어간다 */ });
+    }
+
+    return { init: init, repaint: paintAll };
+  })();
+
+  /* ============================================================
+   * 3단계 — 개념
+   *   ① 주요 개념 최대 3개 : 교사가 먼저 고른다. AI는 끼어들지 않는다.
+   *   ② 관련 개념          : 교과 × 개념 교집합에서 호출 없이 후보가 나온다.
+   *   ③ 검토 의견          : 교사가 고른 뒤에야 AI가 짚어준다(관련 개념 제안과 같은 호출).
+   * ============================================================ */
+  var S3 = (function () {
+    var fw = null, rel = null;
+    var KEY_MAX = 3;
+    var suggested = [];   // AI가 새로 제안한 관련 개념
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function msg(text, tone) {
+      var el = $('#s3-msg');
+      if (!el) return;
+      if (!text) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = text;
+      el.className = 'notice notice--' + (tone || 'info');
+    }
+    function keyConceptList() { return (fw && fw.keyConcepts) || []; }
+    function koOf(id) {
+      var hit = '';
+      keyConceptList().forEach(function (k) { if (k.id === id) hit = k.ko; });
+      return hit || id;
+    }
+    function subjectsForConcepts() {
+      // 1~2학년은 바·슬·즐을 통합교과 하나로 본다(데이터가 그렇게 묶여 있다).
+      var subs = (state.subjects || []).slice();
+      var out = [], seen = {};
+      subs.forEach(function (n) {
+        var name = (n === '바른 생활' || n === '슬기로운 생활' || n === '즐거운 생활') ? '통합교과' : n;
+        if (!seen[name]) { seen[name] = 1; out.push(name); }
+      });
+      return out;
+    }
+
+    /** 교과 × 주요 개념 교집합 — 호출 없음 */
+    function localCandidates() {
+      var want = state.keyConcepts || [];
+      if (!want.length) return [];
+      var out = [];
+      ((rel && rel.bySubject) || []).forEach(function (entry) {
+        if (subjectsForConcepts().indexOf(entry.subject) < 0) return;
+        var hits = [];
+        (entry.concepts || []).forEach(function (c) {
+          var tags = c.keyConcepts || [];
+          var matched = want.filter(function (k) { return tags.indexOf(k) >= 0; });
+          if (matched.length) hits.push({ name: c.name, via: matched });
+        });
+        if (hits.length) out.push({ subject: entry.subject, items: hits });
+      });
+      return out;
+    }
+
+    /** 주요 개념축의 씨앗 낱말 — 교과 교집합이 빈약할 때 곁들인다 */
+    function seedCandidates() {
+      var want = state.keyConcepts || [];
+      var out = [];
+      ((rel && rel.byKeyConcept) || []).forEach(function (e) {
+        if (want.indexOf(e.keyConcept) < 0) return;
+        out.push({ ko: e.ko, items: (e.seed || []).concat(e.extended || []).slice(0, 10) });
+      });
+      return out;
+    }
+
+    function ensure() {
+      return Promise.all([loadData('pyp-framework'), loadData('related-concepts')])
+        .then(function (r) { fw = r[0]; rel = r[1]; return true; });
+    }
+
+    /* ---- 그리기 ---- */
+    function paintKey() {
+      var picked = state.keyConcepts || [];
+      var full = picked.length >= KEY_MAX;
+      var h = '<h3 class="block__title"><span class="block__ord">1</span>주요 개념 고르기</h3>' +
+              '<p class="block__hint">이 단원을 무엇으로 꿰뚫을지 정합니다. 최대 세 개까지, 지금 ' +
+              picked.length + '개를 골랐습니다. 방금 쓰신 중심 아이디어를 다시 읽어 보시면 고르기 쉽습니다.</p>';
+
+      if (state.centralIdea) {
+        h += '<div class="anchor"><p class="anchor__src">지금의 중심 아이디어</p>' +
+             '<p class="anchor__text">' + esc(state.centralIdea) + '</p></div>';
+      }
+      h += '<div class="cards">';
+      keyConceptList().forEach(function (k) {
+        var on = picked.indexOf(k.id) >= 0;
+        h += '<button class="kc" type="button" data-act="key" data-v="' + esc(k.id) + '"' +
+             ' aria-pressed="' + (on ? 'true' : 'false') + '" data-full="' + (full ? 'true' : 'false') + '">' +
+             '<span class="kc__top"><span class="kc__ko">' + esc(k.ko) + '</span>' +
+             '<span class="kc__q">' + esc(k.keyQuestion) + '</span></span>' +
+             '<span class="kc__def">' + esc(k.definition) + '</span></button>';
+      });
+      $('#s3-key').innerHTML = h + '</div>';
+    }
+
+    function chip(name, isNew) {
+      var on = (state.relatedConcepts || []).indexOf(name) >= 0;
+      return '<button class="rc' + (isNew ? ' rc--new' : '') + '" type="button" data-act="rel" data-v="' +
+             esc(name) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(name) + '</button>';
+    }
+
+    function paintRel() {
+      var box = $('#s3-rel');
+      if (!(state.keyConcepts || []).length) { box.innerHTML = ''; return; }
+
+      var guide = (rel && rel.selectionGuide) || {};
+      var n = (state.relatedConcepts || []).length;
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>관련 개념 고르기</h3>' +
+              '<p class="block__hint">' + esc(guide.countGuide || '') +
+              ' 고르신 교과와 주요 개념이 겹치는 자리에서 뽑았습니다.</p>' +
+              '<div class="rowbtns">' +
+              '<button class="btn" type="button" data-act="more">더 제안받고 점검하기</button>' +
+              '<span class="count">고른 관련 개념 <strong>' + n + '</strong>개</span></div>' +
+              '<p class="notice notice--info" id="s3-msg" hidden></p>';
+
+      var local = localCandidates();
+      local.forEach(function (g) {
+        h += '<div class="rcgroup"><p class="rcgroup__head">' + esc(g.subject) + '</p><div class="chips">';
+        g.items.forEach(function (it) { h += chip(it.name, false); });
+        h += '</div></div>';
+      });
+
+      if (!local.length) {
+        h += '<p class="block__hint" style="margin-left:0">고르신 교과에서 맞물리는 개념을 찾지 못했습니다. ' +
+             '아래 개념축 낱말에서 고르거나 제안을 받아 보세요.</p>';
+      }
+
+      seedCandidates().forEach(function (g) {
+        h += '<div class="rcgroup"><p class="rcgroup__head">' + esc(g.ko) +
+             '<span class="rcgroup__from">개념축에서</span></p><div class="chips">';
+        g.items.forEach(function (nm) { h += chip(nm, false); });
+        h += '</div></div>';
+      });
+
+      if (suggested.length) {
+        h += '<div class="rcgroup"><p class="rcgroup__head">추가 제안' +
+             '<span class="rcgroup__from">이 단원에 맞춰 새로 제안한 것</span></p><div class="chips">';
+        suggested.forEach(function (nm) { h += chip(nm, true); });
+        h += '</div></div>';
+      }
+
+      var rv = state.conceptReview;
+      if (rv && rv.text) {
+        h += '<div class="review' + (rv.fit ? ' review--fit' : '') + '">' +
+             '<p class="review__head">AI가 짚어본 것 — 판정이 아니라 검토 재료입니다</p>' +
+             '<p class="review__body">' + esc(rv.text) + '</p></div>';
+      }
+      box.innerHTML = h;
+    }
+
+    function paintAll() {
+      if (!fw || !rel) return;
+      paintKey(); paintRel();
+      saveDraft();
+    }
+
+    /* ---- 조작 ---- */
+    function toggleKey(id) {
+      var list = (state.keyConcepts || []).slice();
+      var at = list.indexOf(id);
+      if (at >= 0) list.splice(at, 1);
+      else {
+        if (list.length >= KEY_MAX) {
+          setStatus('주요 개념은 세 개까지 고를 수 있습니다. 하나를 빼고 다시 골라 주세요.', 'stop');
+          return;
+        }
+        list.push(id);
+      }
+      state.keyConcepts = list;
+      setStatus('8단계 가운데 3단계입니다.');
+      // 주요 개념이 바뀌면 이전 검토 의견은 더 이상 맞지 않는다.
+      state.conceptReview = null;
+      paintAll();
+    }
+
+    function toggleRel(name) {
+      var list = (state.relatedConcepts || []).slice();
+      var at = list.indexOf(name);
+      if (at >= 0) list.splice(at, 1); else list.push(name);
+      state.relatedConcepts = list;
+      paintAll();
+    }
+
+    /* ---- 제안 + 검토 (한 번의 호출) ---- */
+    function buildPrompt() {
+      var picked = (state.keyConcepts || []).map(function (id) {
+        var k = null;
+        keyConceptList().forEach(function (x) { if (x.id === id) k = x; });
+        return k ? ('- ' + k.ko + ' (' + k.keyQuestion + ')') : '- ' + id;
+      }).join('\n');
+
+      var already = (state.relatedConcepts || []).join(', ');
+      var pool = [];
+      localCandidates().forEach(function (g) {
+        g.items.forEach(function (it) { pool.push(it.name); });
+      });
+      var stds = (state.standards || []).map(function (o) {
+        return '- ' + o.code + ' ' + o.text;
+      }).join('\n');
+      var cautions = ((rel && rel.selectionGuide && rel.selectionGuide.cautions) || [])
+        .map(function (c) { return '- ' + c; }).join('\n');
+
+      return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n' +
+             '교사가 이미 주요 개념을 골랐다. 그 선택을 존중하되, 검토할 지점이 있으면 알려 준다.\n\n' +
+             '[학년] ' + state.grade + '학년\n' +
+             '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
+             '[교사가 고른 주요 개념]\n' + picked + '\n' +
+             (already ? '[교사가 이미 고른 관련 개념] ' + already + '\n' : '') +
+             '[화면에 이미 있는 후보] ' + pool.join(', ') + '\n\n' +
+             '[고른 성취기준]\n' + stds + '\n\n' +
+             '[관련 개념을 고를 때의 주의]\n' + cautions + '\n\n' +
+             '[할 일 두 가지]\n' +
+             '1) 이 단원에 어울리는 관련 개념을 3~5개 새로 제안한다. ' +
+             '화면에 이미 있는 후보와 교사가 이미 고른 것은 빼고, 겹치지 않는 낱말만 낸다. ' +
+             '활동명이나 소재명이 아니라 개념 낱말로 낸다.\n' +
+             '2) 교사가 고른 주요 개념이 중심 아이디어·성취기준과 잘 맞물리는지 두세 문장으로 짚는다. ' +
+             '잘 맞으면 어디가 맞는지 말하고, 아쉬우면 무엇이 빠져 보이는지 말한다. ' +
+             '단정하지 말고 교사가 판단할 여지를 남기는 말투로 쓴다. 고쳐야 한다고 명령하지 않는다.\n\n' +
+             '[출력] 다음 형태의 JSON만 출력한다.\n' +
+             '{ "related": ["관련 개념", "관련 개념"], "fit": true, "review": "짚어본 내용 두세 문장" }';
+    }
+
+    function more() {
+      if (!(state.keyConcepts || []).length) { msg('주요 개념을 먼저 골라 주세요.', 'warn'); return; }
+      var btn = $('#s3-rel [data-act="more"]');
+      if (btn) { btn.disabled = true; btn.textContent = '살펴보는 중…'; }
+      msg('중심 아이디어와 견주어 보는 중입니다. 15초쯤 걸립니다.', 'info');
+
+      callGemini(buildPrompt()).then(function (res) {
+        var got = (res && res.related) || [];
+        var have = {};
+        localCandidates().forEach(function (g) {
+          g.items.forEach(function (it) { have[it.name] = 1; });
+        });
+        seedCandidates().forEach(function (g) {
+          g.items.forEach(function (nm) { have[nm] = 1; });
+        });
+        suggested = got
+          .map(function (x) { return String(x || '').trim(); })
+          .filter(function (x) { return x && !have[x] && suggested.indexOf(x) < 0; });
+
+        state.conceptReview = (res && res.review)
+          ? { text: String(res.review), fit: res.fit !== false }
+          : null;
+
+        paintAll();
+        msg(suggested.length
+          ? '관련 개념 ' + suggested.length + '개를 새로 제안했습니다. 아래 점선 칩에서 골라 주세요.'
+          : '새로 제안할 만한 개념이 없습니다. 위 후보에서 골라 주세요.', 'info');
+      })['catch'](function (e) {
+        paintAll();
+        msg(msgOf(e), 'stop');
+      });
+    }
+
+    function bindStep3() {
+      var root = $('#step-3');
+      root.addEventListener('click', function (ev) {
+        var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+        if (!el || !root.contains(el)) return;
+        var v = el.getAttribute('data-v');
+        switch (el.getAttribute('data-act')) {
+          case 'key': toggleKey(v); break;
+          case 'rel': toggleRel(v); break;
+          case 'more': more(); break;
+        }
+      });
+    }
+
+    registerGuard(3, function (st) {
+      var hard = [], soft = [];
+      var kc = (st.keyConcepts || []).length;
+      var rc = (st.relatedConcepts || []).length;
+      if (!kc) hard.push('주요 개념을 하나 이상 골라 주세요.');
+      else if (kc > 3) hard.push('주요 개념은 세 개까지만 고를 수 있습니다.');
+      if (!hard.length) {
+        if (!rc) soft.push('관련 개념을 아직 고르지 않았습니다.');
+        else if (rc > kc * 2) {
+          soft.push('관련 개념이 ' + rc + '개입니다. 주요 개념 하나당 한둘이 자연스럽습니다.');
+        }
+      }
+      return { hard: hard, soft: soft };
+    });
+
+    function init() {
+      bindStep3();
       ensure().then(paintAll)['catch'](function () { /* 데이터가 없으면 조용히 넘어간다 */ });
     }
 
@@ -1444,6 +1757,7 @@
     renderStep();
     S1.init();
     S2.init();
+    S3.init();
   }
 
   if (document.readyState === 'loading') {
