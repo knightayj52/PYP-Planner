@@ -66,11 +66,8 @@
       criteria: { knowledge: '', understanding: '', skills: '' }
     },
 
-    inquiryModel: null,         // 7  'murdoch' | 'marschall'
-    inquiryStages: [],
-    atl: [],
-    learnerProfile: [],
-    actionTypes: [],
+    inquiryModel: null,         // 7  'murdoch5' | 'marschallFrench7'
+    inquiryStages: {},          // { 단계id: [ { text, atl[], lp[], action[] } ] }
 
     connections: {              // 8
       priorThemes: '',
@@ -2720,6 +2717,402 @@
   })();
 
   /* ============================================================
+   * 7단계 — 탐구 과정
+   *   모델을 하나 고르고 단계마다 활동을 배치한다.
+   *   ATL·학습자상·실행 유형은 활동마다 붙인다(어느 활동에서 기르는지가 드러나야 한다).
+   *   모델을 바꾸면 단계 구성이 달라 활동이 이월되지 않는다.
+   * ============================================================ */
+  var S7 = (function () {
+    var fw = null;
+    var open = {};   // 어떤 활동에서 태그 고르개를 펼쳤는지
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function msg(text, tone) {
+      var el = $('#s7-msg');
+      if (!el) return;
+      if (!text) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = text;
+      el.className = 'notice notice--' + (tone || 'info');
+    }
+    function models() { return (fw && fw.inquiryModels) || []; }
+    function modelOf(id) {
+      var hit = null;
+      models().forEach(function (m) { if (m.id === id) hit = m; });
+      return hit;
+    }
+    function atlList() { return (fw && fw.atl) || []; }
+    function lpList() { return (fw && fw.learnerProfile) || []; }
+    function actList() { return (fw && fw.actionTypes) || []; }
+    function koIn(list, id) {
+      var hit = id;
+      list.forEach(function (x) { if (x.id === id) hit = x.ko; });
+      return hit;
+    }
+    function bag() {
+      if (!state.inquiryStages || Array.isArray(state.inquiryStages)) state.inquiryStages = {};
+      return state.inquiryStages;
+    }
+    function acts(stageId) {
+      var b = bag();
+      if (!Array.isArray(b[stageId])) b[stageId] = [];
+      return b[stageId];
+    }
+    function allActs() {
+      var out = [];
+      var m = modelOf(state.inquiryModel);
+      if (!m) return out;
+      m.stages.forEach(function (st) {
+        acts(st.id).forEach(function (a) { if (String(a.text || '').trim()) out.push(a); });
+      });
+      return out;
+    }
+
+    function ensure() {
+      return loadData('pyp-framework').then(function (d) { fw = d; return true; });
+    }
+
+    /* ---- 그리기 ---- */
+    function paintModel() {
+      var h = '<h3 class="block__title"><span class="block__ord">1</span>탐구 모델 고르기</h3>' +
+              '<p class="block__hint">단원을 어떤 흐름으로 굴릴지 정합니다. ' +
+              '두 모델은 단계 구성이 서로 달라, 모델을 바꾸면 배치한 활동이 옮겨지지 않습니다.</p>' +
+              '<div class="model">';
+      models().forEach(function (m) {
+        var on = state.inquiryModel === m.id;
+        h += '<button class="model__btn" type="button" data-act="model" data-v="' + esc(m.id) + '"' +
+             ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
+             '<span class="model__top"><span class="model__ko">' + esc(m.ko) + '</span>' +
+             '<span class="model__cnt">' + m.stageCount + '단계</span></span>' +
+             '<span class="model__src">' + esc(m.source) + '</span>' +
+             '<span class="model__note">' + esc(m.note) + '</span></button>';
+      });
+      h += '</div>';
+
+      if (state.inquiryModel) {
+        h += '<div class="rowbtns">' +
+             '<button class="btn btn--primary" type="button" data-act="gen">' +
+             (allActs().length ? '다시 받기' : '단계별 활동 받기') + '</button></div>';
+      }
+      h += '<p class="notice notice--info" id="s7-msg" hidden></p>';
+      $('#s7-model').innerHTML = h;
+    }
+
+    function tagRow(sid, i, a) {
+      var h = '<div class="act__tags"><span class="act__label">기른다</span>';
+      (a.atl || []).forEach(function (id) {
+        h += '<button class="minitag" type="button" aria-pressed="true" data-act="untag" ' +
+             'data-g="atl" data-s="' + esc(sid) + '" data-i="' + i + '" data-v="' + esc(id) + '">' +
+             esc(koIn(atlList(), id)) + '</button>';
+      });
+      (a.lp || []).forEach(function (id) {
+        h += '<button class="minitag minitag--lp" type="button" aria-pressed="true" data-act="untag" ' +
+             'data-g="lp" data-s="' + esc(sid) + '" data-i="' + i + '" data-v="' + esc(id) + '">' +
+             esc(koIn(lpList(), id)) + '</button>';
+      });
+      (a.action || []).forEach(function (id) {
+        h += '<button class="minitag minitag--at" type="button" aria-pressed="true" data-act="untag" ' +
+             'data-g="action" data-s="' + esc(sid) + '" data-i="' + i + '" data-v="' + esc(id) + '">' +
+             esc(koIn(actList(), id)) + '</button>';
+      });
+      var key = sid + ':' + i;
+      h += '<button class="act__more" type="button" data-act="more" data-s="' + esc(sid) + '" data-i="' + i + '">' +
+           (open[key] ? '닫기' : '태그 고르기') + '</button></div>';
+
+      if (open[key]) {
+        h += '<div class="picker">';
+        [['atl', 'ATL 기능', atlList(), ''],
+         ['lp', '학습자상', lpList(), ' minitag--lp'],
+         ['action', '실행 유형', actList(), ' minitag--at']].forEach(function (g) {
+          h += '<p class="picker__ko">' + g[1] + '</p><div class="chips">';
+          g[2].forEach(function (x) {
+            var onNow = ((a[g[0]] || []).indexOf(x.id) >= 0);
+            h += '<button class="minitag' + g[3] + '" type="button" aria-pressed="' + (onNow ? 'true' : 'false') + '" ' +
+                 'data-act="tag" data-g="' + g[0] + '" data-s="' + esc(sid) + '" data-i="' + i + '" ' +
+                 'data-v="' + esc(x.id) + '">' + esc(x.ko) + '</button>';
+          });
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+      return h;
+    }
+
+    function paintStages() {
+      var box = $('#s7-stages');
+      var m = modelOf(state.inquiryModel);
+      if (!m) { box.innerHTML = ''; return; }
+
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>단계별 활동 배치</h3>' +
+              '<p class="block__hint">활동마다 무엇을 기르는지 태그를 답니다. ' +
+              'ATL 기능은 초록, 학습자상은 노랑, 실행 유형은 빨강으로 표시됩니다.</p>';
+
+      m.stages.forEach(function (st, si) {
+        h += '<div class="stage"><div class="stage__head">' +
+             '<span class="stage__ord">' + (si + 1) + '</span>' +
+             '<span class="stage__ko">' + esc(st.ko) + '</span>' +
+             '<span class="stage__en">' + esc(st.en) + '</span></div>' +
+             '<ul class="stage__goals">';
+        (st.goals || []).forEach(function (g) { h += '<li>' + esc(g) + '</li>'; });
+        h += '</ul>';
+
+        acts(st.id).forEach(function (a, i) {
+          h += '<div class="act"><div class="act__row">' +
+               '<textarea class="act__in" data-act="edit" data-s="' + esc(st.id) + '" data-i="' + i + '" ' +
+               'placeholder="이 단계에서 할 활동">' + esc(a.text || '') + '</textarea>' +
+               '<button class="act__del" type="button" data-act="del" data-s="' + esc(st.id) + '" data-i="' + i + '" ' +
+               'aria-label="지우기">×</button></div>' +
+               tagRow(st.id, i, a) + '</div>';
+        });
+
+        h += '<button class="stage__add" type="button" data-act="add" data-s="' + esc(st.id) + '">활동 추가</button></div>';
+      });
+
+      // 고른 것 가운데 어디에도 안 붙은 항목을 알려 준다
+      var used = { atl: {}, lp: {}, action: {} };
+      allActs().forEach(function (a) {
+        (a.atl || []).forEach(function (x) { used.atl[x] = 1; });
+        (a.lp || []).forEach(function (x) { used.lp[x] = 1; });
+        (a.action || []).forEach(function (x) { used.action[x] = 1; });
+      });
+      h += '<div class="tally"><b>활동 ' + allActs().length + '개</b>';
+      var kinds = [];
+      if (!Object.keys(used.atl).length) kinds.push('ATL 기능');
+      if (!Object.keys(used.lp).length) kinds.push('학습자상');
+      if (kinds.length) h += '<span class="tally__miss">' + kinds.join(' · ') + ' 태그가 아직 없음</span>';
+      else h += '<span>ATL 기능 ' + Object.keys(used.atl).length + '가지, 학습자상 ' +
+                Object.keys(used.lp).length + '가지가 걸려 있습니다.</span>';
+      h += '</div>';
+
+      box.innerHTML = h;
+      grow(box);
+    }
+
+    function grow(root) {
+      if (!root) return;
+      $$('textarea', root).forEach(function (el) {
+        el.style.height = 'auto';
+        el.style.height = Math.max(el.offsetHeight, el.scrollHeight + 2) + 'px';
+      });
+    }
+
+    function paintAll() {
+      if (!fw) return;
+      paintModel(); paintStages();
+      saveDraft();
+    }
+
+    /* ---- 생성 ---- */
+    function buildPrompt() {
+      var m = modelOf(state.inquiryModel);
+      var lines = (state.linesOfInquiry || [])
+        .filter(function (l) { return String(l.text || '').trim(); })
+        .map(function (l, i) { return (i + 1) + ') ' + l.text; }).join('\n');
+      var stages = m.stages.map(function (st, i) {
+        return (i + 1) + '. ' + st.id + ' (' + st.ko + '): ' + (st.goals || []).join(' / ');
+      }).join('\n');
+      var atl = atlList().map(function (x) { return x.id + '=' + x.ko; }).join(', ');
+      var lp = lpList().map(function (x) { return x.id + '=' + x.ko; }).join(', ');
+      var act = actList().map(function (x) { return x.id + '=' + x.ko; }).join(', ');
+      var a = state.assessment || {};
+
+      var p = '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+              '[학년] ' + state.grade + '학년\n' +
+              '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
+              '[탐구 목록]\n' + lines + '\n' +
+              (a.summative ? '[총괄평가] ' + String(a.summative).replace(/\n/g, ' ') + '\n' : '') + '\n' +
+              '[탐구 모델] ' + m.ko + ' — ' + m.source + '\n' +
+              '[단계와 목적]\n' + stages + '\n\n' +
+              '[할 일] 각 단계에 활동을 2~3개씩 배치한다.\n' +
+              '- 활동은 교실에서 실제로 할 수 있는 일로, 한 문장으로 쓴다.\n' +
+              '- 그 단계의 목적에 맞는 활동을 쓴다. 단계를 건너뛰거나 비우지 않는다.\n' +
+              '- 앞 단계에서 한 일이 뒷 단계로 이어지게 한다.\n' +
+              '- 총괄평가로 이어지는 흐름이 되게 한다.\n';
+
+      // Murdoch 에는 일반화 단계가 없으므로 수렴 활동을 두 단계에 나눠 넣게 한다
+      if (m.id === 'murdoch5') {
+        p += '- 이 모델에는 일반화하기가 독립 단계로 없다. ' +
+             '개념을 문장으로 모아 세우는 일반화 수렴 활동은 범주화하기(sortingOut)와 더 나아가기(goingFurther)에 나누어 넣는다. ' +
+             '범주화하기에서는 찾은 것을 견주어 관계를 문장으로 세우게 하고, ' +
+             '더 나아가기에서는 그 문장을 새 사례에 대어 보며 다듬게 한다.\n';
+      } else {
+        p += '- 성찰하기(reflect)는 마지막에만 몰지 말고, 다른 단계의 활동 안에도 성찰이 스미도록 쓴다.\n';
+      }
+
+      p += '\n활동마다 무엇을 기르는지 아래 목록의 영문 id로 표시한다.\n' +
+           '- atl (기르는 기능, 0~2개): ' + atl + '\n' +
+           '- lp (드러나는 학습자상, 0~2개): ' + lp + '\n' +
+           '- action (실행 유형, 0~1개. 실제 행동으로 이어지는 활동에만 붙인다): ' + act + '\n' +
+           '전부 채우려 애쓰지 않는다. 그 활동에서 실제로 길러지는 것만 붙인다.\n' +
+           '다만 단원 전체로 보아 ATL 다섯 범주 가운데 셋 이상, 학습자상 가운데 셋 이상이 어딘가에는 나오게 한다.\n\n' +
+           '공통 조건:\n' +
+           '- ' + state.grade + '학년 교실에서 할 수 있는 활동으로 쓴다.\n' +
+           '- 평서형으로 끝낸다. 존댓말 어미를 쓰지 않는다.\n' +
+           '- 고유명사와 특정 지명·인명을 넣지 않는다.\n\n' +
+           '[출력] 다음 형태의 JSON만 출력한다. stage 값은 위 단계의 영문 id를 그대로 쓴다.\n' +
+           '{ "stages": [ { "stage": "' + m.stages[0].id + '", "activities": [ ' +
+           '{ "text": "활동 한 문장", "atl": ["thinking"], "lp": ["inquirer"], "action": [] } ] } ] }';
+      return p;
+    }
+
+    function generate() {
+      var m = modelOf(state.inquiryModel);
+      if (!m) { msg('탐구 모델을 먼저 골라 주세요.', 'warn'); return; }
+      var btn = $('#s7-model [data-act="gen"]');
+      if (btn) { btn.disabled = true; btn.textContent = '만드는 중…'; }
+      msg('탐구 흐름에 맞춰 활동을 배치하는 중입니다. 25초쯤 걸립니다.', 'info');
+
+      callGemini(buildPrompt()).then(function (res) {
+        var got = (res && res.stages) || [];
+        var okIds = {};
+        m.stages.forEach(function (st) { okIds[st.id] = 1; });
+        var atlOk = {}, lpOk = {}, actOk = {};
+        atlList().forEach(function (x) { atlOk[x.id] = 1; });
+        lpList().forEach(function (x) { lpOk[x.id] = 1; });
+        actList().forEach(function (x) { actOk[x.id] = 1; });
+        var keep = function (arr, dict) {
+          return (arr || []).map(function (v) { return String(v || '').trim(); })
+                            .filter(function (v) { return dict[v]; });
+        };
+
+        var next = {};
+        m.stages.forEach(function (st) { next[st.id] = []; });
+        got.forEach(function (g) {
+          var sid = String((g && g.stage) || '').trim();
+          if (!okIds[sid]) return;
+          (g.activities || []).forEach(function (a) {
+            var t = String((a && a.text) || '').trim();
+            if (!t) return;
+            next[sid].push({
+              text: t,
+              atl: keep(a.atl, atlOk),
+              lp: keep(a.lp, lpOk),
+              action: keep(a.action, actOk)
+            });
+          });
+        });
+        state.inquiryStages = next;
+        open = {};
+        paintAll();
+
+        var n = allActs().length;
+        msg(n ? '활동 ' + n + '개를 배치했습니다. 우리 반 사정에 맞게 고쳐 쓰고 태그를 확인해 주세요.'
+              : '활동을 배치하지 못했습니다. 다시 눌러 주세요.', n ? 'info' : 'warn');
+      })['catch'](function (e) {
+        paintAll();
+        msg(msgOf(e), 'stop');
+      });
+    }
+
+    /* ---- 조작 ---- */
+    function pickModel(id) {
+      if (state.inquiryModel === id) return;
+      // 두 모델은 단계 구성이 달라 활동을 옮길 수 없다.
+      state.inquiryModel = id;
+      state.inquiryStages = {};
+      open = {};
+      paintAll();
+    }
+    function addAct(sid) {
+      acts(sid).push({ text: '', atl: [], lp: [], action: [] });
+      paintAll();
+      var boxes = $$('#s7-stages [data-act="edit"][data-s="' + sid + '"]');
+      if (boxes.length) boxes[boxes.length - 1].focus();
+    }
+    function delAct(sid, i) {
+      var arr = acts(sid);
+      if (i < 0 || i >= arr.length) return;
+      arr.splice(i, 1);
+      open = {};
+      paintAll();
+    }
+    function toggleTag(g, sid, i, v) {
+      var a = acts(sid)[i];
+      if (!a) return;
+      if (!Array.isArray(a[g])) a[g] = [];
+      var at = a[g].indexOf(v);
+      if (at >= 0) a[g].splice(at, 1); else a[g].push(v);
+      paintAll();
+    }
+    function toggleMore(sid, i) {
+      var key = sid + ':' + i;
+      if (open[key]) delete open[key]; else open[key] = 1;
+      paintAll();
+    }
+
+    function bindStep7() {
+      var root = $('#step-7');
+      root.addEventListener('click', function (ev) {
+        var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+        if (!el || !root.contains(el)) return;
+        var act = el.getAttribute('data-act');
+        var sid = el.getAttribute('data-s');
+        var i = Number(el.getAttribute('data-i'));
+        if (act === 'model') pickModel(el.getAttribute('data-v'));
+        if (act === 'gen') generate();
+        if (act === 'add') addAct(sid);
+        if (act === 'del') delAct(sid, i);
+        if (act === 'more') toggleMore(sid, i);
+        if (act === 'tag' || act === 'untag') {
+          toggleTag(el.getAttribute('data-g'), sid, i, el.getAttribute('data-v'));
+        }
+      });
+      root.addEventListener('input', function (ev) {
+        var t = ev.target;
+        if (!t || !t.matches || !t.matches('[data-act="edit"]')) return;
+        var a = acts(t.getAttribute('data-s'))[Number(t.getAttribute('data-i'))];
+        if (a) { a.text = t.value; saveDraft(); }
+        t.style.height = 'auto';
+        t.style.height = (t.scrollHeight + 2) + 'px';
+      });
+    }
+
+    registerGuard(7, function (st) {
+      var hard = [], soft = [];
+      var m = modelOf(st.inquiryModel);
+      if (!m) { hard.push('탐구 모델을 골라 주세요.'); return { hard: hard, soft: soft }; }
+
+      var b = (st.inquiryStages && !Array.isArray(st.inquiryStages)) ? st.inquiryStages : {};
+      var filled = function (sid) {
+        return (b[sid] || []).filter(function (a) { return String(a.text || '').trim(); });
+      };
+      var total = 0;
+      m.stages.forEach(function (s2) { total += filled(s2.id).length; });
+      if (!total) hard.push('탐구 단계에 활동을 하나 이상 써 주세요.');
+
+      if (!hard.length) {
+        var empty = [];
+        m.stages.forEach(function (s2) { if (!filled(s2.id).length) empty.push(s2.ko); });
+        if (empty.length) soft.push(empty.join(' · ') + ' 단계가 비어 있습니다.');
+
+        var used = { atl: {}, lp: {} }, noTag = 0;
+        m.stages.forEach(function (s2) {
+          filled(s2.id).forEach(function (a) {
+            (a.atl || []).forEach(function (x) { used.atl[x] = 1; });
+            (a.lp || []).forEach(function (x) { used.lp[x] = 1; });
+            if (!(a.atl || []).length && !(a.lp || []).length) noTag++;
+          });
+        });
+        if (!Object.keys(used.atl).length) soft.push('ATL 기능 태그가 어느 활동에도 없습니다.');
+        if (!Object.keys(used.lp).length) soft.push('학습자상 태그가 어느 활동에도 없습니다.');
+        if (noTag && noTag === total) soft.push('활동에 태그가 하나도 붙어 있지 않습니다.');
+      }
+      return { hard: hard, soft: soft };
+    });
+
+    function init() {
+      bindStep7();
+      ensure().then(paintAll)['catch'](function () { /* 데이터가 없으면 조용히 넘어간다 */ });
+    }
+
+    return { init: init, repaint: paintAll };
+  })();
+
+  /* ============================================================
    * 테마
    * ============================================================ */
   function applyTheme(mode) {
@@ -2790,11 +3183,13 @@
     S4.init();
     S5.init();
     S6.init();
+    S7.init();
     registerPainter(2, S2.repaint);
     registerPainter(3, S3.repaint);
     registerPainter(4, S4.repaint);
     registerPainter(5, S5.repaint);
     registerPainter(6, S6.repaint);
+    registerPainter(7, S7.repaint);
   }
 
   if (document.readyState === 'loading') {
