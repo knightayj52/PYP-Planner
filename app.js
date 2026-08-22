@@ -156,12 +156,22 @@
     if (tone) el.dataset.tone = tone; else delete el.dataset.tone;
   }
 
+  /* 단계별 다시 그리기 함수 등록소.
+     앞 단계를 고치고 돌아와도 뒷 단계가 그 결과를 반영하도록 한다. */
+  var painters = {};
+  function registerPainter(step, fn) { painters[step] = fn; }
+  function repaintCurrent() {
+    var fn = painters[state.step];
+    if (typeof fn === 'function') fn();
+  }
+
   function goStep(n) {
     if (n < 1 || n > APP.lastStep) return;
     if (n > state.reached) return;
     state.step = n;
     saveDraft();
     renderStep({ scroll: true });
+    repaintCurrent();
   }
 
   function goNext() {
@@ -184,9 +194,7 @@
     state.reached = Math.max(state.reached, state.step);
     saveDraft();
     renderStep({ scroll: true });
-    if (state.step === 2 && typeof S2 !== 'undefined') S2.repaint();
-    if (state.step === 3 && typeof S3 !== 'undefined') S3.repaint();
-    if (state.step === 4 && typeof S4 !== 'undefined') S4.repaint();
+    repaintCurrent();
   }
 
   /* ============================================================
@@ -1945,6 +1953,305 @@
   })();
 
   /* ============================================================
+   * 5단계 — 질문
+   *   탐구 목록마다 교사 발문(사실·개념·논쟁)과 예상 학생 질문을 마련한다.
+   *   교사 발문은 유형을 나눠 두어야 탐구가 사실 확인에 머물지 않는다.
+   * ============================================================ */
+  var S5 = (function () {
+    var fw = null;
+    // 순서가 곧 탐구의 흐름이다: 사례를 모으고(사실) → 개념을 뽑아내고(형성)
+    // → 개념끼리의 관계를 묻고(개념) → 근거를 들어 견준다(논쟁).
+    var TYPES = ['사실', '형성', '개념', '논쟁'];
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function msg(text, tone) {
+      var el = $('#s5-msg');
+      if (!el) return;
+      if (!text) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = text;
+      el.className = 'notice notice--' + (tone || 'info');
+    }
+    function koOf(id) {
+      var hit = id;
+      ((fw && fw.keyConcepts) || []).forEach(function (k) { if (k.id === id) hit = k.ko; });
+      return hit;
+    }
+    function loi() {
+      return (state.linesOfInquiry || []).filter(function (l) { return String(l.text || '').trim(); });
+    }
+    /** 탐구 목록 순서에 맞춰 질문 칸을 준비한다. */
+    function slots() {
+      if (!Array.isArray(state.teacherQuestions)) state.teacherQuestions = [];
+      if (!Array.isArray(state.studentQuestions)) state.studentQuestions = [];
+      var n = loi().length;
+      while (state.teacherQuestions.length < n) state.teacherQuestions.push([]);
+      while (state.studentQuestions.length < n) state.studentQuestions.push([]);
+      state.teacherQuestions.length = n;
+      state.studentQuestions.length = n;
+      return n;
+    }
+
+    function ensure() {
+      return loadData('pyp-framework').then(function (d) { fw = d; return true; });
+    }
+
+    /* ---- 그리기 ---- */
+    function paintGen() {
+      var has = (state.teacherQuestions || []).some(function (a) { return (a || []).length; });
+      var h = '<h3 class="block__title"><span class="block__ord">1</span>질문 마련하기</h3>' +
+              '<p class="block__hint">탐구 목록마다 교사가 던질 발문과, 학생이 던질 법한 질문을 미리 그려 둡니다. ' +
+              '아래 네 결은 탐구가 나아가는 순서이기도 합니다. 사례를 모으고, 거기서 개념을 뽑아내고, ' +
+              '개념끼리의 관계를 묻고, 마지막에 근거를 들어 견줍니다.</p>' +
+              '<div class="qlegend">' +
+              '<span><b>사실</b> 자료나 관찰로 답이 정해지는 질문</span>' +
+              '<span><b>형성</b> 여러 사례에서 개념을 뽑아내게 하는 질문</span>' +
+              '<span><b>개념</b> 개념과 개념의 관계를 묻는 질문</span>' +
+              '<span><b>논쟁</b> 답이 갈리고 근거를 대야 하는 질문</span>' +
+              '</div>' +
+              '<div class="rowbtns">' +
+              '<button class="btn btn--primary" type="button" data-act="gen">' +
+              (has ? '다시 받기' : '질문 받기') + '</button></div>' +
+              '<p class="notice notice--info" id="s5-msg" hidden></p>';
+      $('#s5-gen').innerHTML = h;
+    }
+
+    function qrow(kind, i, j, item) {
+      var t = (item && item.type) || '사실';
+      var text = (item && item.text) || '';
+      var h = '<div class="qrow">';
+      if (kind === 't') {
+        h += '<button class="qrow__type" type="button" data-act="type" data-i="' + i + '" data-j="' + j + '"' +
+             ' data-t="' + esc(t) + '" title="누르면 결이 바뀝니다">' + esc(t) + '</button>';
+      } else {
+        h += '<span class="qrow__type">학생</span>';
+      }
+      h += '<textarea class="qrow__in" data-act="edit" data-k="' + kind + '" data-i="' + i + '" data-j="' + j + '"' +
+           ' rows="1" placeholder="' + (kind === 't' ? '교사 발문' : '학생이 던질 법한 질문') + '">' +
+           esc(text) + '</textarea>' +
+           '<button class="qrow__del" type="button" data-act="del" data-k="' + kind + '" data-i="' + i + '" data-j="' + j + '"' +
+           ' aria-label="지우기">×</button></div>';
+      return h;
+    }
+
+    function paintList() {
+      var box = $('#s5-list');
+      var arr = loi();
+      if (!arr.length) {
+        box.innerHTML = '<p class="block__hint" style="margin-left:0">4단계에서 탐구 목록을 먼저 써 주세요.</p>';
+        return;
+      }
+      slots();
+
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>탐구 목록별 질문</h3>' +
+              '<p class="block__hint">받은 질문은 우리 반 말로 고쳐 쓰고, 필요 없으면 지우세요. ' +
+              '발문 왼쪽의 결 표시를 누르면 사실 · 형성 · 개념 · 논쟁으로 바뀝니다.</p>';
+
+      arr.forEach(function (l, i) {
+        h += '<div class="qloi"><div class="qloi__head">' +
+             '<span class="qloi__ord">' + (i + 1) + '</span>' +
+             '<span class="qloi__text">' + esc(l.text) + '</span>';
+        (l.concepts || []).forEach(function (c) {
+          h += '<span class="qloi__tag">' + esc(koOf(c)) + '</span>';
+        });
+        h += '</div>';
+
+        h += '<div class="qgroup"><p class="qgroup__head">교사 발문' +
+             '<span class="qgroup__note">세 결이 고루 있으면 좋습니다</span></p>';
+        (state.teacherQuestions[i] || []).forEach(function (q, j) { h += qrow('t', i, j, q); });
+        h += '<button class="qadd" type="button" data-act="add" data-k="t" data-i="' + i + '">발문 추가</button></div>';
+
+        h += '<div class="qgroup"><p class="qgroup__head">예상 학생 질문' +
+             '<span class="qgroup__note">도입에서 아이들이 꺼낼 법한 말</span></p>';
+        (state.studentQuestions[i] || []).forEach(function (q, j) { h += qrow('s', i, j, q); });
+        h += '<button class="qadd" type="button" data-act="add" data-k="s" data-i="' + i + '">질문 추가</button></div>';
+
+        h += '</div>';
+      });
+      box.innerHTML = h;
+    }
+
+    function paintAll() {
+      if (!fw) return;
+      paintGen(); paintList();
+      saveDraft();
+    }
+
+    /* ---- 생성 ---- */
+    function buildPrompt() {
+      var arr = loi();
+      var body = arr.map(function (l, i) {
+        var tags = (l.concepts || []).map(koOf).join(', ');
+        return (i + 1) + ') ' + l.text + (tags ? ' [개념: ' + tags + ']' : '');
+      }).join('\n');
+      var rc = (state.relatedConcepts || []).join(', ');
+
+      return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+             '[학년] ' + state.grade + '학년\n' +
+             '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
+             (rc ? '[관련 개념] ' + rc + '\n' : '') + '\n' +
+             '[탐구 목록]\n' + body + '\n\n' +
+             '[할 일] 탐구 목록마다 다음 두 가지를 만든다.\n\n' +
+             '1) 교사 발문 4개. 아래 네 결을 하나씩 만든다. 이 순서가 곧 탐구가 나아가는 순서다.\n' +
+             '   - 사실: 자료를 찾거나 관찰하면 답이 정해지는 질문.\n' +
+             '     예) 우리 학교에는 어떤 약속이 있나요?\n' +
+             '   - 형성: 모아 놓은 사례에서 개념을 뽑아내게 하는 질문. ' +
+             '개념의 뜻을 아직 모르는 상태에서, 사례들의 공통점·차이점을 살펴 스스로 개념에 이르게 한다. ' +
+             '개념을 이미 아는 것으로 전제하고 묻지 않는다.\n' +
+             '     예) 이 약속들에서 함께 나타나는 점은 무엇인가요? / 규칙이라고 부를 수 있는 것과 아닌 것을 어떻게 나눌 수 있을까요?\n' +
+             '   - 개념: 개념과 개념의 관계를 묻는 질문. 특정 사례에만 통하면 안 되고, 여러 사례에 걸쳐 통해야 한다.\n' +
+             '     예) 규칙은 공동체에 어떤 영향을 주나요?\n' +
+             '   - 논쟁: 답이 하나로 모이지 않고 근거를 들어 견주어야 하는 질문.\n' +
+             '     예) 규칙을 정할 때 모두의 의견을 들어야 할까요?\n\n' +
+             '2) 예상 학생 질문 2개. 단원을 열었을 때 ' + state.grade + '학년 아이가 실제로 꺼낼 법한 말투로 쓴다. ' +
+             '어른의 정돈된 말이 아니라 아이의 소박한 궁금증으로 쓴다.\n\n' +
+             '공통 조건:\n' +
+             '- 모든 질문은 물음표로 끝낸다.\n' +
+             '- ' + state.grade + '학년이 알아들을 낱말로 쓴다.\n' +
+             '- 예 아니오로 끝나는 질문은 피한다.\n' +
+             '- 고유명사와 특정 지명·인명을 넣지 않는다.\n\n' +
+             '[출력] 다음 형태의 JSON만 출력한다. lines 배열의 순서는 위 탐구 목록 순서와 같게 한다.\n' +
+             '{ "lines": [ { "teacher": [ { "type": "사실", "text": "발문" } ], "student": ["학생 질문"] } ] }';
+    }
+
+    function generate() {
+      if (!loi().length) { msg('4단계에서 탐구 목록을 먼저 써 주세요.', 'warn'); return; }
+      var btn = $('#s5-gen [data-act="gen"]');
+      if (btn) { btn.disabled = true; btn.textContent = '만드는 중…'; }
+      msg('탐구 목록마다 발문과 학생 질문을 짓는 중입니다. 20초쯤 걸립니다.', 'info');
+
+      callGemini(buildPrompt()).then(function (res) {
+        var got = (res && res.lines) || [];
+        var n = loi().length;
+        var tq = [], sq = [];
+        for (var i = 0; i < n; i++) {
+          var one = got[i] || {};
+          tq.push((one.teacher || []).filter(function (q) { return q && q.text; }).map(function (q) {
+            var t = String(q.type || '').trim();
+            return { type: TYPES.indexOf(t) >= 0 ? t : '사실', text: String(q.text).trim() };
+          }));
+          sq.push((one.student || []).map(function (q) {
+            return { text: String(typeof q === 'string' ? q : (q && q.text) || '').trim() };
+          }).filter(function (q) { return q.text; }));
+        }
+        state.teacherQuestions = tq;
+        state.studentQuestions = sq;
+        paintAll();
+
+        var total = tq.reduce(function (a, b) { return a + b.length; }, 0);
+        msg(total
+          ? '발문 ' + total + '개와 학생 질문을 만들었습니다. 우리 반 말로 고쳐 쓰세요.'
+          : '질문을 만들지 못했습니다. 다시 눌러 주세요.', total ? 'info' : 'warn');
+      })['catch'](function (e) {
+        paintAll();
+        msg(msgOf(e), 'stop');
+      });
+    }
+
+    /* ---- 조작 ---- */
+    function bucket(kind, i) {
+      slots();
+      var arr = kind === 't' ? state.teacherQuestions : state.studentQuestions;
+      if (!arr[i]) arr[i] = [];
+      return arr[i];
+    }
+    function addOne(kind, i) {
+      bucket(kind, i).push(kind === 't' ? { type: '사실', text: '' } : { text: '' });
+      paintAll();
+      var sel = '#s5-list [data-act="edit"][data-k="' + kind + '"][data-i="' + i + '"]';
+      var boxes = $$(sel);
+      if (boxes.length) boxes[boxes.length - 1].focus();
+    }
+    function delOne(kind, i, j) {
+      var b = bucket(kind, i);
+      if (j < 0 || j >= b.length) return;
+      b.splice(j, 1);
+      paintAll();
+    }
+    function rotate(i, j) {
+      var b = bucket('t', i);
+      if (!b[j]) return;
+      var at = TYPES.indexOf(b[j].type);
+      b[j].type = TYPES[(at + 1) % TYPES.length];
+      // 결만 바뀌므로 편집 중인 글은 건드리지 않는다
+      var btn = $('#s5-list [data-act="type"][data-i="' + i + '"][data-j="' + j + '"]');
+      if (btn) { btn.setAttribute('data-t', b[j].type); btn.textContent = b[j].type; }
+      saveDraft();
+    }
+
+    function bindStep5() {
+      var root = $('#step-5');
+      root.addEventListener('click', function (ev) {
+        var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+        if (!el || !root.contains(el)) return;
+        var act = el.getAttribute('data-act');
+        var i = Number(el.getAttribute('data-i'));
+        var j = Number(el.getAttribute('data-j'));
+        var k = el.getAttribute('data-k');
+        if (act === 'gen') generate();
+        if (act === 'add') addOne(k, i);
+        if (act === 'del') delOne(k, i, j);
+        if (act === 'type') rotate(i, j);
+      });
+      root.addEventListener('input', function (ev) {
+        var t = ev.target;
+        if (!t || !t.matches || !t.matches('[data-act="edit"]')) return;
+        var b = bucket(t.getAttribute('data-k'), Number(t.getAttribute('data-i')));
+        var item = b[Number(t.getAttribute('data-j'))];
+        if (item) { item.text = t.value; saveDraft(); }
+      });
+    }
+
+    registerGuard(5, function (st) {
+      var hard = [], soft = [];
+      var arr = (st.linesOfInquiry || []).filter(function (l) { return String(l.text || '').trim(); });
+      var tq = st.teacherQuestions || [];
+      var filled = function (list) {
+        return (list || []).filter(function (q) { return String(q.text || '').trim(); });
+      };
+      var any = tq.some(function (a) { return filled(a).length; });
+      if (!any) hard.push('교사 발문을 하나 이상 써 주세요.');
+
+      if (!hard.length) {
+        var empty = [];
+        arr.forEach(function (l, i) { if (!filled(tq[i]).length) empty.push(i + 1); });
+        if (empty.length) soft.push('탐구 목록 ' + empty.join(' · ') + '번에 발문이 없습니다.');
+
+        var noConcept = [], jump = [];
+        arr.forEach(function (l, i) {
+          var kinds = {};
+          filled(tq[i]).forEach(function (q) { kinds[q.type] = 1; });
+          if (!kinds['개념']) noConcept.push(i + 1);
+          // 개념을 뽑아내는 걸음 없이 관계부터 물으면 교사만 아는 대화가 되기 쉽다
+          else if (!kinds['형성']) jump.push(i + 1);
+        });
+        if (noConcept.length) {
+          soft.push('탐구 목록 ' + noConcept.join(' · ') + '번에 개념 질문이 없습니다. 사실 확인에 머물 수 있습니다.');
+        }
+        if (jump.length) {
+          soft.push('탐구 목록 ' + jump.join(' · ') + '번에 형성 질문 없이 개념 질문만 있습니다. ' +
+                    '학생이 개념을 잡기 전에 관계부터 묻게 될 수 있습니다.');
+        }
+
+        var noStudent = (st.studentQuestions || []).every(function (a) { return !filled(a).length; });
+        if (noStudent) soft.push('예상 학생 질문이 비어 있습니다.');
+      }
+      return { hard: hard, soft: soft };
+    });
+
+    function init() {
+      bindStep5();
+      ensure().then(paintAll)['catch'](function () { /* 데이터가 없으면 조용히 넘어간다 */ });
+    }
+
+    return { init: init, repaint: paintAll };
+  })();
+
+  /* ============================================================
    * 테마
    * ============================================================ */
   function applyTheme(mode) {
@@ -2013,6 +2320,11 @@
     S2.init();
     S3.init();
     S4.init();
+    S5.init();
+    registerPainter(2, S2.repaint);
+    registerPainter(3, S3.repaint);
+    registerPainter(4, S4.repaint);
+    registerPainter(5, S5.repaint);
   }
 
   if (document.readyState === 'loading') {
