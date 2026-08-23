@@ -928,6 +928,83 @@ html[data-theme="dark"] .minitag--at[aria-pressed="true"]{color:#1F100C}
   background:var(--warn-wash);color:var(--warn);
 }
 
+/* ---- 8단계: 검증과 내보내기 ---- */
+.check2{
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:15px 17px;margin-bottom:11px;
+}
+.check2__head{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.check2__ko{font-size:15.5px;font-weight:700}
+.check2__cnt{
+  margin-left:auto;font-size:12.5px;font-weight:700;
+  padding:1px 9px;border-radius:99px;
+  border:1px solid var(--line);color:var(--ink-3);
+}
+.check2__cnt[data-t="ok"]{
+  border-color:color-mix(in srgb,var(--pine) 45%,transparent);
+  background:var(--pine-wash);color:var(--pine-ink);
+}
+.check2__cnt[data-t="stop"]{
+  border-color:color-mix(in srgb,var(--alert) 45%,transparent);
+  background:var(--alert-wash);color:var(--alert);
+}
+.check2__cnt[data-t="warn"]{
+  border-color:color-mix(in srgb,var(--warn) 45%,transparent);
+  background:var(--warn-wash);color:var(--warn);
+}
+.vlist{list-style:none;margin:0;padding:0}
+.vitem{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:8px 0;border-top:1px solid var(--line-2);
+  font-size:14.5px;line-height:1.55;
+}
+.vitem:first-child{border-top:0}
+.vitem__mark{
+  flex:none;width:20px;height:20px;border-radius:99px;
+  display:grid;place-items:center;margin-top:1px;
+  font-size:12px;font-weight:700;
+}
+.vitem__mark[data-t="ok"]{background:var(--pine-wash);color:var(--pine-ink)}
+.vitem__mark[data-t="stop"]{background:var(--alert-wash);color:var(--alert)}
+.vitem__mark[data-t="warn"]{background:var(--warn-wash);color:var(--warn)}
+.vitem__body{flex:1;min-width:0}
+.vitem__go{
+  flex:none;background:none;border:0;cursor:pointer;
+  color:var(--pine-ink);font-size:13px;font-weight:600;
+  padding:2px 8px;border-radius:5px;white-space:nowrap;
+}
+html[data-theme="dark"] .vitem__go{color:var(--pine)}
+.vitem__go:hover{background:var(--pine-wash)}
+
+.ctx{margin-bottom:12px}
+.ctx__ko{font-size:14.5px;font-weight:700;margin-bottom:2px}
+.ctx__why{font-size:13px;color:var(--ink-3);line-height:1.5;margin-bottom:7px}
+.ctx__in{
+  width:100%;min-height:70px;padding:10px 12px;
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-size:14.5px;line-height:1.55;resize:vertical;overflow:hidden;
+}
+.ctx__in:focus{outline:2px solid var(--pine);border-color:var(--pine)}
+
+.sum{
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:6px 17px 13px;margin-bottom:13px;
+}
+.sum__row{display:flex;gap:13px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line-2)}
+.sum__row:first-child{border-top:0}
+.sum__key{flex:none;width:112px;font-size:13px;font-weight:700;color:var(--ink-3);padding-top:1px}
+.sum__val{flex:1;min-width:0;font-size:14.5px;line-height:1.55}
+.sum__val ul{margin:0;padding-left:17px}
+.sum__val li{margin-bottom:2px}
+.sum__val em{font-style:normal;color:var(--ink-3)}
+@media (max-width: 620px){
+  .sum__row{flex-direction:column;gap:3px}
+  .sum__key{width:auto}
+}
+
 /* ============================================================
    반응형
    ============================================================ */
@@ -966,9 +1043,24 @@ html[data-theme="dark"] .minitag--at[aria-pressed="true"]{color:#1F100C}
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
 }
 @media print{
-  .appbar,.rail,.stepnav,.foot__badge{display:none}
-  .shell{display:block;padding:0}
-  .step{display:block !important}
+  /* 여덟 단계를 한 문서처럼 이어 붙여 찍는다. 조작용 요소는 감춘다. */
+  .appbar,.rail,.stepnav,.foot__badge,
+  .btn,.rowbtns,.act__del,.qrow__del,.loi__del,.stage__drop,.stage__add,
+  .act__more,.picker,.qadd,.blk__foot,.vitem__go,.notice,
+  #s8-check,#s8-out{display:none !important}
+  .shell{display:block;padding:0;max-width:none}
+  .step{display:block !important;page-break-after:always;animation:none}
+  .step:last-of-type{page-break-after:auto}
+  .step__title{font-size:20px}
+  body{background:#fff;color:#000;font-size:11pt}
+  .card,.asm,.stage,.blk,.act,.qloi,.loi,.crit__cell,.group,.anchor,.sum{
+    background:#fff;border-color:#bbb;box-shadow:none;
+  }
+  textarea,input{
+    background:#fff !important;color:#000 !important;border-color:#bbb !important;
+    resize:none;overflow:visible;
+  }
+  .minitag,.chip,.tagbtn,.rc,.qrow__type,.tag{border-color:#999}
 }
 </style>
 </head>
@@ -1132,7 +1224,9 @@ html[data-theme="dark"] .minitag--at[aria-pressed="true"]{color:#1F100C}
         <h2 class="step__title" id="t8">점검하고 내보내기</h2>
         <p class="step__hint">필수 항목이 빠지지 않았는지 확인하고, 연결되는 맥락을 덧붙인 뒤 워드 문서로 내려받습니다.</p>
       </div>
-      <div class="placeholder"><strong>검증 게이트 · 연결 맥락 · 내보내기</strong>다음 작업에서 채웁니다.</div>
+      <div class="block" id="s8-check"></div>
+      <div class="block" id="s8-ctx"></div>
+      <div class="block" id="s8-out"></div>
     </section>
 
     <!-- ========== 이동 막대 ========== -->
@@ -1216,6 +1310,7 @@ html[data-theme="dark"] .minitag--at[aria-pressed="true"]{color:#1F100C}
   </div>
 </dialog>
 
+<script src="https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
