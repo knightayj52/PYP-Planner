@@ -548,9 +548,9 @@
     }, function () { return 'network'; });
   }
 
-  /** 워드 내보내기. 경기도 실습 틀 구조로 다음 작업에서 구현. */
+  /** 마지막 단계의 '내보내기' 버튼. 8단계 모듈이 실제 일을 한다. */
   function exportDocx() {
-    setStatus('내보내기는 다음 작업에서 붙입니다.', 'stop');
+    if (typeof S8 !== 'undefined' && S8.exportDocx) S8.exportDocx();
   }
 
   /* ============================================================
@@ -3395,6 +3395,608 @@
   })();
 
   /* ============================================================
+   * 8단계 — 점검하고 내보내기
+   *   ① 1~7단계를 한자리에서 다시 훑는다(차단·확인 두 층).
+   *   ② 연결되는 맥락 세 가지를 덧붙인다.
+   *   ③ 경기도 실습 틀 구조로 워드 문서를 만든다.
+   * ============================================================ */
+  var S8 = (function () {
+    var fw = null;
+
+    var CTX = [
+      { id: 'priorThemes', ko: '과거 초학문적 주제 학습과의 연결성',
+        why: '앞서 다룬 주제에서 무엇을 이어받고, 어떤 이해 위에 이 단원을 세우는지 적습니다.' },
+      { id: 'otherSubjects', ko: '다른 교과와의 연결성',
+        why: '이 단원에 직접 넣지는 않았지만 맞닿는 교과와 그 접점을 적습니다.' },
+      { id: 'localGlobal', ko: '지역·글로벌 과제와의 연결성',
+        why: '학생이 사는 곳의 일과 세계의 일 가운데 이 단원이 닿는 지점을 적습니다.' }
+    ];
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function msg(text, tone) {
+      var el = $('#s8-msg');
+      if (!el) return;
+      if (!text) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = text;
+      el.className = 'notice notice--' + (tone || 'info');
+    }
+    function C() {
+      if (!state.connections) state.connections = { priorThemes: '', otherSubjects: '', localGlobal: '' };
+      return state.connections;
+    }
+    function t(v) { return String(v == null ? '' : v).trim(); }
+    function koIn(list, id) {
+      var hit = id;
+      (list || []).forEach(function (x) { if (x.id === id) hit = x.ko; });
+      return hit;
+    }
+    function themeKo(id) { return koIn((fw && fw.transdisciplinaryThemes) || [], id); }
+    function conceptKo(id) { return koIn((fw && fw.keyConcepts) || [], id); }
+    function modelOf(id) {
+      var hit = null;
+      ((fw && fw.inquiryModels) || []).forEach(function (m) { if (m.id === id) hit = m; });
+      return hit;
+    }
+    function loi() {
+      return (state.linesOfInquiry || []).filter(function (l) { return t(l.text); });
+    }
+
+    function ensure() {
+      return loadData('pyp-framework').then(function (d) { fw = d; return true; });
+    }
+
+    /* ---- 1~7단계 종합 점검 ---- */
+    function audit() {
+      var out = [];
+      for (var n = 1; n <= 7; n++) {
+        var r = checkStep(n);
+        r.hard.forEach(function (m2) { out.push({ step: n, kind: 'stop', text: m2 }); });
+        r.soft.forEach(function (m2) { out.push({ step: n, kind: 'warn', text: m2 }); });
+      }
+      return out;
+    }
+    var STEP_KO = ['', '주제·성취기준', '중심 아이디어', '개념', '탐구 목록', '질문', '평가', '탐구 과정'];
+
+    function paintCheck() {
+      var list = audit();
+      var stops = list.filter(function (x) { return x.kind === 'stop'; });
+      var warns = list.filter(function (x) { return x.kind === 'warn'; });
+
+      var h = '<h3 class="block__title"><span class="block__ord">1</span>빠진 곳 점검</h3>' +
+              '<p class="block__hint">1단계부터 7단계까지 한자리에서 다시 훑었습니다. ' +
+              '빨강은 채워야 넘어갈 수 있고, 노랑은 확인만 하시면 됩니다.</p>';
+
+      h += '<div class="check2"><div class="check2__head">' +
+           '<span class="check2__ko">반드시 채울 것</span>' +
+           '<span class="check2__cnt" data-t="' + (stops.length ? 'stop' : 'ok') + '">' +
+           (stops.length ? stops.length + '곳' : '모두 채웠습니다') + '</span></div>';
+      if (stops.length) {
+        h += '<ul class="vlist">';
+        stops.forEach(function (x) {
+          h += '<li class="vitem"><span class="vitem__mark" data-t="stop">!</span>' +
+               '<span class="vitem__body"><b>' + esc(STEP_KO[x.step]) + '</b> · ' + esc(x.text) + '</span>' +
+               '<button class="vitem__go" type="button" data-act="go" data-v="' + x.step + '">' +
+               x.step + '단계로</button></li>';
+        });
+        h += '</ul>';
+      } else {
+        h += '<ul class="vlist"><li class="vitem">' +
+             '<span class="vitem__mark" data-t="ok">✓</span>' +
+             '<span class="vitem__body">UOI 필수 항목이 모두 들어 있습니다.</span></li></ul>';
+      }
+      h += '</div>';
+
+      h += '<div class="check2"><div class="check2__head">' +
+           '<span class="check2__ko">한 번 살펴볼 것</span>' +
+           '<span class="check2__cnt" data-t="' + (warns.length ? 'warn' : 'ok') + '">' +
+           (warns.length ? warns.length + '곳' : '없습니다') + '</span></div>';
+      if (warns.length) {
+        h += '<ul class="vlist">';
+        warns.forEach(function (x) {
+          h += '<li class="vitem"><span class="vitem__mark" data-t="warn">?</span>' +
+               '<span class="vitem__body"><b>' + esc(STEP_KO[x.step]) + '</b> · ' + esc(x.text) + '</span>' +
+               '<button class="vitem__go" type="button" data-act="go" data-v="' + x.step + '">' +
+               x.step + '단계로</button></li>';
+        });
+        h += '</ul><p class="block__hint" style="margin:9px 0 0">' +
+             '차시 사정이나 학급 형편으로 그렇게 두신 것이라면 그대로 내보내셔도 됩니다.</p>';
+      } else {
+        h += '<ul class="vlist"><li class="vitem">' +
+             '<span class="vitem__mark" data-t="ok">✓</span>' +
+             '<span class="vitem__body">따로 살펴볼 곳이 없습니다.</span></li></ul>';
+      }
+      h += '</div>';
+
+      $('#s8-check').innerHTML = h;
+    }
+
+    function paintCtx() {
+      var c = C();
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>연결되는 맥락 <span class="pick__meta">(선택)</span></h3>' +
+              '<p class="block__hint">이 단원이 앞뒤로 무엇과 이어지는지 적어 두면, ' +
+              '다음 해에 이 문서를 볼 때나 학년 협의 때 쓸모가 있습니다.</p>' +
+              '<div class="rowbtns">' +
+              '<button class="btn" type="button" data-act="ctx">맥락 제안받기</button></div>' +
+              '<p class="notice notice--info" id="s8-msg" hidden></p>';
+      CTX.forEach(function (x) {
+        h += '<div class="ctx"><p class="ctx__ko">' + esc(x.ko) + '</p>' +
+             '<p class="ctx__why">' + esc(x.why) + '</p>' +
+             '<textarea class="ctx__in" data-act="ctxin" data-k="' + x.id + '" ' +
+             'placeholder="비워 두셔도 됩니다">' + esc(c[x.id] || '') + '</textarea></div>';
+      });
+      $('#s8-ctx').innerHTML = h;
+      grow($('#s8-ctx'));
+    }
+
+    function paintOut() {
+      var stops = audit().filter(function (x) { return x.kind === 'stop'; });
+      var m = modelOf(state.inquiryModel);
+      var p = state.inquiryPlan;
+      var hours = 0;
+      if (p && p.blocks) {
+        p.blocks.forEach(function (b) {
+          (b.stages || []).forEach(function (sl) {
+            (sl.acts || []).forEach(function (a) { if (t(a.text)) hours += Number(a.hours) || 0; });
+          });
+        });
+      }
+
+      var h = '<h3 class="block__title"><span class="block__ord">3</span>내보내기</h3>' +
+              '<p class="block__hint">지금까지 쓰신 내용을 한 문서로 묶습니다. ' +
+              '워드 파일은 학교 양식에 맞춰 고쳐 쓰실 수 있습니다.</p>';
+
+      // 한눈에 보는 요약
+      h += '<div class="sum">';
+      var row = function (k, v) {
+        h += '<div class="sum__row"><span class="sum__key">' + esc(k) + '</span>' +
+             '<span class="sum__val">' + (v || '<em>비어 있음</em>') + '</span></div>';
+      };
+      row('학년 · 교과', esc((state.grade ? state.grade + '학년' : '') +
+          ((state.subjects || []).length ? ' · ' + state.subjects.join(', ') : '')));
+      row('초학문적 주제', esc(themeKo(state.theme)));
+      row('중심 아이디어', esc(state.centralIdea));
+      row('주요 개념', esc((state.keyConcepts || []).map(conceptKo).join(' · ')));
+      row('관련 개념', esc((state.relatedConcepts || []).join(', ')));
+      var ls = loi();
+      row('탐구 목록', ls.length ? '<ul>' + ls.map(function (l) {
+        return '<li>' + esc(l.text) + '</li>';
+      }).join('') + '</ul>' : '');
+      row('성취기준', esc((state.standards || []).length ? (state.standards.length + '개') : ''));
+      row('탐구 과정', esc(m ? (m.ko + ' · 활동 ' + (p ? '' : '') + hours + '차시') : ''));
+      h += '</div>';
+
+      h += '<div class="rowbtns">' +
+           '<button class="btn btn--primary btn--lg" type="button" data-act="docx"' +
+           (stops.length ? ' disabled' : '') + '>워드로 내려받기</button>' +
+           '<button class="btn btn--lg" type="button" data-act="print">인쇄 · PDF로 저장</button>' +
+           '</div>';
+      if (stops.length) {
+        h += '<p class="notice notice--warn" style="margin-top:10px">' +
+             '반드시 채울 곳 ' + stops.length + '군데를 먼저 채워 주세요. 인쇄는 지금도 됩니다.</p>';
+      }
+      h += '<p class="notice notice--info" id="s8-omsg" hidden></p>';
+      $('#s8-out').innerHTML = h;
+    }
+
+    function grow(root) {
+      if (!root) return;
+      $$('textarea', root).forEach(function (el) {
+        el.style.height = 'auto';
+        el.style.height = Math.max(el.offsetHeight, el.scrollHeight + 2) + 'px';
+      });
+    }
+
+    function paintAll() {
+      if (!fw) return;
+      paintCheck(); paintCtx(); paintOut();
+      saveDraft();
+    }
+
+    /* ---- 맥락 제안 ---- */
+    function buildCtxPrompt() {
+      var ls = loi().map(function (l, i) { return (i + 1) + ') ' + l.text; }).join('\n');
+      return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+             '[학년] ' + state.grade + '학년\n' +
+             '[교과] ' + (state.subjects || []).join(', ') + '\n' +
+             '[초학문적 주제] ' + themeKo(state.theme) + '\n' +
+             '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
+             '[주요 개념] ' + (state.keyConcepts || []).map(conceptKo).join(', ') + '\n' +
+             '[탐구 목록]\n' + ls + '\n\n' +
+             '[할 일] 이 단원이 앞뒤로 무엇과 이어지는지 세 갈래로 적는다.\n' +
+             '- priorThemes: 이 학년 학생이 앞서 다뤘을 법한 초학문적 주제 학습과의 연결. ' +
+             '무엇을 이어받아 어떤 이해 위에 이 단원을 세우는지 쓴다.\n' +
+             '- otherSubjects: 이 단원에 넣지 않은 교과 가운데 맞닿는 것과 그 접점. ' +
+             '이미 고른 교과(' + (state.subjects || []).join(', ') + ')는 빼고 쓴다.\n' +
+             '- localGlobal: 학생이 사는 지역의 일과 세계의 일 가운데 이 단원이 닿는 지점.\n\n' +
+             '조건:\n' +
+             '- 각 갈래를 두세 문장으로 쓴다.\n' +
+             '- 평서형으로 끝낸다. 존댓말 어미를 쓰지 않는다.\n' +
+             '- 특정 지역명·기관명·인명을 넣지 않는다. 어느 학교에서나 읽히도록 쓴다.\n\n' +
+             '[출력] 다음 형태의 JSON만 출력한다.\n' +
+             '{ "priorThemes": "…", "otherSubjects": "…", "localGlobal": "…" }';
+    }
+
+    function askCtx() {
+      if (!state.centralIdea) { msg('2단계에서 중심 아이디어를 먼저 써 주세요.', 'warn'); return; }
+      var btn = $('#s8-ctx [data-act="ctx"]');
+      if (btn) { btn.disabled = true; btn.textContent = '살펴보는 중…'; }
+      msg('이 단원이 무엇과 이어지는지 살펴보는 중입니다. 15초쯤 걸립니다.', 'info');
+
+      callGemini(buildCtxPrompt()).then(function (res) {
+        var c = C();
+        CTX.forEach(function (x) {
+          var v = res && res[x.id];
+          if (v) c[x.id] = String(v).trim();
+        });
+        paintAll();
+        msg('맥락을 채웠습니다. 우리 학교 사정에 맞게 고쳐 주세요.', 'info');
+      })['catch'](function (e) {
+        paintAll();
+        msg(msgOf(e), 'stop');
+      });
+    }
+
+    /* ---- 문서에 담을 내용 모으기 ---- */
+    function payload() {
+      var m = modelOf(state.inquiryModel);
+      var p = state.inquiryPlan;
+      var a = state.assessment || {};
+      var c = C();
+      var ls = loi();
+
+      var title = (state.grade ? state.grade + '학년 ' : '') + (themeKo(state.theme) || 'UOI');
+      var fmv = Array.isArray(a.formative) ? a.formative : (a.formative ? [a.formative] : []);
+
+      var blocks = [];
+      if (m && p && p.blocks) {
+        p.blocks.forEach(function (b) {
+          var stages = [];
+          (b.stages || []).forEach(function (sl) {
+            var st = null;
+            m.stages.forEach(function (x) { if (x.id === sl.id) st = x; });
+            var acts = (sl.acts || []).filter(function (x) { return t(x.text); }).map(function (x) {
+              return {
+                text: t(x.text),
+                hours: Number(x.hours) || 0,
+                tags: []
+                  .concat((x.atl || []).map(function (id) { return koIn(fw.atl, id); }))
+                  .concat((x.lp || []).map(function (id) { return koIn(fw.learnerProfile, id); }))
+                  .concat((x.action || []).map(function (id) { return koIn(fw.actionTypes, id); }))
+              };
+            });
+            if (acts.length) stages.push({ ko: st ? st.ko : sl.id, acts: acts });
+          });
+          if (stages.length) {
+            var name = (b.kind === 'intro') ? '단원 열기'
+                     : (b.kind === 'outro') ? '단원 닫기'
+                     : ('탐구 목록 ' + (b.loi + 1) + (ls[b.loi] ? ' — ' + ls[b.loi].text : ''));
+            blocks.push({ ko: name, stages: stages });
+          }
+        });
+      }
+
+      return {
+        title: title,
+        grade: state.grade,
+        subjects: (state.subjects || []).slice(),
+        unit: state.tonghapUnit ? state.tonghapUnit.unit : '',
+        theme: themeKo(state.theme),
+        centralIdea: t(state.centralIdea),
+        keyConcepts: (state.keyConcepts || []).map(conceptKo),
+        relatedConcepts: (state.relatedConcepts || []).slice(),
+        standards: (state.standards || []).map(function (s2) {
+          return { code: s2.code, subject: s2.subject, text: s2.text };
+        }),
+        lines: ls.map(function (l, i) {
+          return {
+            text: l.text,
+            concepts: (l.concepts || []).map(conceptKo),
+            teacher: ((state.teacherQuestions || [])[i] || []).filter(function (q) { return t(q.text); }),
+            student: ((state.studentQuestions || [])[i] || []).filter(function (q) { return t(q.text); }),
+            formative: t(fmv[i])
+          };
+        }),
+        assessment: {
+          diagnostic: t(a.diagnostic),
+          summative: t(a.summative),
+          frame: a.frame || null,
+          frameData: a.frameData || {},
+          criteria: a.criteria || {}
+        },
+        model: m ? m.ko : '',
+        modelSource: m ? m.source : '',
+        targetHours: (p && p.targetHours) || 0,
+        blocks: blocks,
+        connections: { priorThemes: t(c.priorThemes), otherSubjects: t(c.otherSubjects), localGlobal: t(c.localGlobal) }
+      };
+    }
+
+    /* ---- 워드 내보내기 ---- */
+    var DOCX_CDNS = [
+      'https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.js',
+      'https://unpkg.com/docx@9.7.1/dist/index.iife.js'
+    ];
+    var docxLoading = null;
+    var BORDER = 'C8C0AE', LABEL_BG = 'EDF0F4', HEAD_BG = 'E2E7EE';
+
+    function loadDocx() {
+      if (window.docx) return Promise.resolve(window.docx);
+      if (docxLoading) return docxLoading;
+      docxLoading = new Promise(function (resolve, reject) {
+        var i = 0;
+        function tryNext() {
+          if (window.docx) { resolve(window.docx); return; }
+          if (i >= DOCX_CDNS.length) {
+            docxLoading = null;
+            reject(new Error('문서 만드는 구성요소를 불러오지 못했습니다. ' +
+              '학교 네트워크가 외부 주소를 막고 있을 수 있습니다. ' +
+              '다른 네트워크에서 다시 하시거나 「인쇄 · PDF로 저장」을 이용해 주세요.'));
+            return;
+          }
+          var sc = document.createElement('script');
+          sc.src = DOCX_CDNS[i++];
+          sc.async = true;
+          sc.onload = function () { window.docx ? resolve(window.docx) : tryNext(); };
+          sc.onerror = function () { tryNext(); };
+          document.head.appendChild(sc);
+        }
+        tryNext();
+      });
+      return docxLoading;
+    }
+
+    function docxBody(d, p) {
+      var paras = function (text) {
+        return String(text == null ? '' : text).split('\n').map(function (ln) {
+          return new d.Paragraph({ children: [new d.TextRun({ text: ln, size: 20 })], spacing: { after: 20 } });
+        });
+      };
+      var cell = function (text, opt) {
+        opt = opt || {};
+        return new d.TableCell({
+          children: paras(text),
+          shading: opt.bg ? { type: d.ShadingType.CLEAR, fill: opt.bg, color: 'auto' } : undefined,
+          width: opt.width ? { size: opt.width, type: d.WidthType.DXA } : undefined,
+          margins: { top: 60, bottom: 60, left: 100, right: 100 }
+        });
+      };
+      var bold = function (text, opt) {
+        opt = opt || {};
+        return new d.TableCell({
+          children: String(text == null ? '' : text).split('\n').map(function (ln) {
+            return new d.Paragraph({ children: [new d.TextRun({ text: ln, bold: true, size: 20 })] });
+          }),
+          shading: { type: d.ShadingType.CLEAR, fill: opt.bg || LABEL_BG, color: 'auto' },
+          width: opt.width ? { size: opt.width, type: d.WidthType.DXA } : undefined,
+          margins: { top: 60, bottom: 60, left: 100, right: 100 }
+        });
+      };
+      var borders = function () {
+        var b = { style: d.BorderStyle.SINGLE, size: 4, color: BORDER };
+        return { top: b, bottom: b, left: b, right: b, insideHorizontal: b, insideVertical: b };
+      };
+      var kv = function (rows) {
+        return new d.Table({
+          rows: rows.map(function (r) {
+            return new d.TableRow({ children: [bold(r[0], { width: 2300 }), cell(r[1] || '', { width: 6700 })] });
+          }),
+          width: { size: 9000, type: d.WidthType.DXA }, borders: borders()
+        });
+      };
+      var table = function (header, rows, widths) {
+        var head = new d.TableRow({
+          tableHeader: true,
+          children: header.map(function (hh, i) {
+            return bold(hh, { bg: HEAD_BG, width: widths ? widths[i] : undefined });
+          })
+        });
+        var body = (rows || []).map(function (cells) {
+          return new d.TableRow({
+            children: cells.map(function (cc, i) { return cell(cc, { width: widths ? widths[i] : undefined }); })
+          });
+        });
+        return new d.Table({ rows: [head].concat(body), width: { size: 9000, type: d.WidthType.DXA }, borders: borders() });
+      };
+      var h2 = function (text) {
+        return new d.Paragraph({ text: text, heading: d.HeadingLevel.HEADING_2, spacing: { before: 280, after: 120 } });
+      };
+      var h3 = function (text) {
+        return new d.Paragraph({ text: text, heading: d.HeadingLevel.HEADING_3, spacing: { before: 180, after: 80 } });
+      };
+      var gap = function () { return new d.Paragraph({ text: '', spacing: { after: 80 } }); };
+      var bullets = function (arr) { return (arr && arr.length) ? '• ' + arr.join('\n• ') : ''; };
+
+      var out = [];
+      out.push(new d.Paragraph({
+        children: [new d.TextRun({ text: p.title + ' 탐구 단원(UOI) 설계안', bold: true, size: 32 })],
+        spacing: { after: 160 }
+      }));
+
+      /* 1. 개요 */
+      out.push(h2('1. 단원 개요'));
+      out.push(kv([
+        ['학년', p.grade ? p.grade + '학년' : ''],
+        ['교과', p.subjects.join(', ') + (p.unit ? '  (통합교과 단원: ' + p.unit + ')' : '')],
+        ['초학문적 주제', p.theme],
+        ['중심 아이디어', p.centralIdea],
+        ['주요 개념', p.keyConcepts.join(' · ')],
+        ['관련 개념', p.relatedConcepts.join(', ')],
+        ['탐구 모델', p.model + (p.modelSource ? '  (' + p.modelSource + ')' : '')],
+        ['운영 차시', p.targetHours ? p.targetHours + '차시' : '']
+      ]));
+      out.push(gap());
+
+      /* 2. 성취기준 */
+      out.push(h2('2. 관련 성취기준'));
+      out.push(table(['코드', '교과', '성취기준'],
+        p.standards.map(function (s2) { return [s2.code, s2.subject, s2.text]; }),
+        [1400, 1000, 6600]));
+      out.push(gap());
+
+      /* 3. 탐구 목록과 질문 */
+      out.push(h2('3. 탐구 목록과 질문'));
+      p.lines.forEach(function (l, i) {
+        out.push(h3((i + 1) + '. ' + l.text + (l.concepts.length ? '  [' + l.concepts.join(' · ') + ']' : '')));
+        var rows = [];
+        var byType = {};
+        l.teacher.forEach(function (q) {
+          if (!byType[q.type]) byType[q.type] = [];
+          byType[q.type].push(q.text);
+        });
+        ['사실', '형성', '개념', '논쟁'].forEach(function (k) {
+          if (byType[k]) rows.push([k + ' 질문', bullets(byType[k])]);
+        });
+        if (l.student.length) {
+          rows.push(['예상 학생 질문', bullets(l.student.map(function (q) { return q.text; }))]);
+        }
+        if (l.formative) rows.push(['형성평가', l.formative]);
+        if (rows.length) out.push(kv(rows));
+        out.push(gap());
+      });
+
+      /* 4. 평가 */
+      out.push(h2('4. 평가'));
+      var arows = [['진단평가', p.assessment.diagnostic], ['총괄평가', p.assessment.summative]];
+      out.push(kv(arows));
+      if (p.assessment.frame) {
+        var FR = {
+          grasps: [['goal', '목표'], ['role', '역할'], ['audience', '청중'],
+                   ['situation', '상황'], ['product', '산출물'], ['standards', '기준']],
+          rafts: [['role', '역할'], ['audience', '청중'], ['format', '형식'],
+                  ['topic', '주제'], ['strong', '강한 동사']]
+        }[p.assessment.frame];
+        var fdata = p.assessment.frameData || {};
+        var frows = FR.filter(function (x) { return t(fdata[x[0]]); })
+                      .map(function (x) { return [x[1], fdata[x[0]]]; });
+        if (frows.length) {
+          out.push(h3('총괄평가 ' + (p.assessment.frame === 'grasps' ? 'GRASPS' : 'RAFTS')));
+          out.push(kv(frows));
+        }
+      }
+      out.push(h3('도달 기준'));
+      out.push(kv([
+        ['지식', p.assessment.criteria.knowledge || ''],
+        ['이해', p.assessment.criteria.understanding || ''],
+        ['기능', p.assessment.criteria.skills || '']
+      ]));
+      out.push(gap());
+
+      /* 5. 탐구 과정 */
+      out.push(h2('5. 탐구 과정'));
+      p.blocks.forEach(function (b) {
+        out.push(h3(b.ko));
+        var rows = [];
+        b.stages.forEach(function (st) {
+          st.acts.forEach(function (a, i) {
+            rows.push([i === 0 ? st.ko : '', a.text, a.hours ? a.hours + '차시' : '',
+                       a.tags.length ? a.tags.join('\n') : '']);
+          });
+        });
+        out.push(table(['단계', '활동', '차시', '기르는 것'], rows, [1400, 4600, 900, 2100]));
+        out.push(gap());
+      });
+
+      /* 6. 연결되는 맥락 */
+      var cn = p.connections;
+      if (cn.priorThemes || cn.otherSubjects || cn.localGlobal) {
+        out.push(h2('6. 연결되는 맥락'));
+        out.push(kv([
+          ['과거 주제 학습과의 연결', cn.priorThemes],
+          ['다른 교과와의 연결', cn.otherSubjects],
+          ['지역·글로벌 과제와의 연결', cn.localGlobal]
+        ]));
+      }
+
+      out.push(new d.Paragraph({
+        children: [new d.TextRun({
+          text: '이 설계안은 PYP 탐구 단원 설계 도우미로 만들었습니다. ' +
+                'IBO의 검토나 승인을 받은 도구가 아니며, 공식 기준은 학교의 IB 문서를 따릅니다.',
+          size: 16, color: '888888'
+        })],
+        spacing: { before: 400 }
+      }));
+      return out;
+    }
+
+    function safeName(s2) {
+      return String(s2 || '설계안').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+    }
+
+    function exportDocxFile() {
+      var p = payload();
+      var btn = $('#s8-out [data-act="docx"]');
+      if (btn) { btn.disabled = true; btn.textContent = '문서를 만드는 중…'; }
+      var omsg = function (text, tone) {
+        var el = $('#s8-omsg');
+        if (!el) return;
+        el.hidden = !text;
+        el.textContent = text || '';
+        el.className = 'notice notice--' + (tone || 'info');
+      };
+      omsg('워드 문서를 만드는 중입니다.', 'info');
+
+      loadDocx().then(function (d) {
+        var doc = new d.Document({
+          styles: { default: { document: { run: { font: '맑은 고딕', size: 20 } } } },
+          sections: [{ properties: {}, children: docxBody(d, p) }]
+        });
+        return d.Packer.toBlob(doc);
+      }).then(function (blob) {
+        var name = safeName('[UOI] ' + p.title) + '.docx';
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        paintOut();
+        omsg(name + ' 파일을 내려받았습니다.', 'info');
+      })['catch'](function (e) {
+        paintOut();
+        omsg(msgOf(e), 'stop');
+      });
+    }
+
+    function bindStep8() {
+      var root = $('#step-8');
+      root.addEventListener('click', function (ev) {
+        var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+        if (!el || !root.contains(el)) return;
+        var act = el.getAttribute('data-act');
+        if (act === 'go') goStep(Number(el.getAttribute('data-v')));
+        if (act === 'ctx') askCtx();
+        if (act === 'docx') exportDocxFile();
+        if (act === 'print') window.print();
+      });
+      root.addEventListener('input', function (ev) {
+        var t2 = ev.target;
+        if (!t2 || !t2.matches || !t2.matches('[data-act="ctxin"]')) return;
+        C()[t2.getAttribute('data-k')] = t2.value;
+        saveDraft();
+        t2.style.height = 'auto';
+        t2.style.height = (t2.scrollHeight + 2) + 'px';
+      });
+    }
+
+    registerGuard(8, function () {
+      // 마지막 단계이므로 다음 버튼은 내보내기로 이어진다. 여기서는 막지 않는다.
+      return { hard: [], soft: [] };
+    });
+
+    function init() {
+      bindStep8();
+      ensure().then(paintAll)['catch'](function () { /* 데이터가 없으면 조용히 넘어간다 */ });
+    }
+
+    return { init: init, repaint: paintAll, exportDocx: exportDocxFile };
+  })();
+
+  /* ============================================================
    * 테마
    * ============================================================ */
   function applyTheme(mode) {
@@ -3466,12 +4068,14 @@
     S5.init();
     S6.init();
     S7.init();
+    S8.init();
     registerPainter(2, S2.repaint);
     registerPainter(3, S3.repaint);
     registerPainter(4, S4.repaint);
     registerPainter(5, S5.repaint);
     registerPainter(6, S6.repaint);
     registerPainter(7, S7.repaint);
+    registerPainter(8, S8.repaint);
   }
 
   if (document.readyState === 'loading') {
