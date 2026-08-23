@@ -1403,14 +1403,14 @@
 
   /* ============================================================
    * 3단계 — 개념
-   *   ① 주요 개념 최대 3개 : 교사가 먼저 고른다. AI는 끼어들지 않는다.
-   *   ② 관련 개념          : 교과 × 개념 교집합에서 호출 없이 후보가 나온다.
-   *   ③ 검토 의견          : 교사가 고른 뒤에야 AI가 짚어준다(관련 개념 제안과 같은 호출).
+   *   ① 명시된 개념 최대 3개 : 교사가 먼저 고른다. AI는 끼어들지 않는다.
+   *   ② 기타 개념          : 교과 × 개념 교집합에서 호출 없이 후보가 나온다.
+   *   ③ 검토 의견          : 교사가 고른 뒤에야 AI가 짚어준다(기타 개념 제안과 같은 호출).
    * ============================================================ */
   var S3 = (function () {
     var fw = null, rel = null;
     var KEY_MAX = 3;
-    var suggested = [];   // AI가 새로 제안한 관련 개념
+    var suggested = [];   // AI가 새로 제안한 기타 개념
 
     function esc(v) {
       return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
@@ -1442,7 +1442,7 @@
       return out;
     }
 
-    /** 교과 × 주요 개념 교집합 — 호출 없음 */
+    /** 교과 × 명시된 개념 교집합 — 호출 없음 */
     function localCandidates() {
       var want = state.keyConcepts || [];
       if (!want.length) return [];
@@ -1460,7 +1460,7 @@
       return out;
     }
 
-    /** 주요 개념축의 씨앗 낱말 — 교과 교집합이 빈약할 때 곁들인다 */
+    /** 명시된 개념축의 씨앗 낱말 — 교과 교집합이 빈약할 때 곁들인다 */
     function seedCandidates() {
       var want = state.keyConcepts || [];
       var out = [];
@@ -1480,9 +1480,10 @@
     function paintKey() {
       var picked = state.keyConcepts || [];
       var full = picked.length >= KEY_MAX;
-      var h = '<h3 class="block__title"><span class="block__ord">1</span>주요 개념 고르기</h3>' +
+      var h = '<h3 class="block__title"><span class="block__ord">1</span>명시된 개념 고르기</h3>' +
               '<p class="block__hint">이 단원을 무엇으로 꿰뚫을지 정합니다. 최대 세 개까지, 지금 ' +
-              picked.length + '개를 골랐습니다. 방금 쓰신 중심 아이디어를 다시 읽어 보시면 고르기 쉽습니다.</p>';
+              picked.length + '개를 골랐습니다. 방금 쓰신 중심 아이디어를 다시 읽어 보시면 고르기 쉽습니다. ' +
+              '<span class="pick__meta">예전에 주요 개념이라 부르던 것입니다.</span></p>';
 
       if (state.centralIdea) {
         h += '<div class="anchor"><p class="anchor__src">지금의 중심 아이디어</p>' +
@@ -1512,12 +1513,13 @@
 
       var guide = (rel && rel.selectionGuide) || {};
       var n = (state.relatedConcepts || []).length;
-      var h = '<h3 class="block__title"><span class="block__ord">2</span>관련 개념 고르기</h3>' +
+      var h = '<h3 class="block__title"><span class="block__ord">2</span>기타 개념 고르기</h3>' +
               '<p class="block__hint">' + esc(guide.countGuide || '') +
-              ' 고르신 교과와 주요 개념이 겹치는 자리에서 뽑았습니다.</p>' +
+              ' 고르신 교과와 명시된 개념이 겹치는 자리에서 뽑았습니다. ' +
+              '<span class="pick__meta">예전에 관련 개념이라 부르던 것입니다.</span></p>' +
               '<div class="rowbtns">' +
               '<button class="btn" type="button" data-act="more">더 제안받고 점검하기</button>' +
-              '<span class="count">고른 관련 개념 <strong>' + n + '</strong>개</span></div>' +
+              '<span class="count">고른 기타 개념 <strong>' + n + '</strong>개</span></div>' +
               '<p class="notice notice--info" id="s3-msg" hidden></p>';
 
       var local = localCandidates();
@@ -1568,14 +1570,14 @@
       if (at >= 0) list.splice(at, 1);
       else {
         if (list.length >= KEY_MAX) {
-          setStatus('주요 개념은 세 개까지 고를 수 있습니다. 하나를 빼고 다시 골라 주세요.', 'stop');
+          setStatus('명시된 개념은 세 개까지 고를 수 있습니다. 하나를 빼고 다시 골라 주세요.', 'stop');
           return;
         }
         list.push(id);
       }
       state.keyConcepts = list;
       setStatus('8단계 가운데 3단계입니다.');
-      // 주요 개념이 바뀌면 이전 검토 의견은 더 이상 맞지 않는다.
+      // 명시된 개념이 바뀌면 이전 검토 의견은 더 이상 맞지 않는다.
       state.conceptReview = null;
       paintAll();
     }
@@ -1608,27 +1610,27 @@
         .map(function (c) { return '- ' + c; }).join('\n');
 
       return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n' +
-             '교사가 이미 주요 개념을 골랐다. 그 선택을 존중하되, 검토할 지점이 있으면 알려 준다.\n\n' +
+             '교사가 이미 명시된 개념을 골랐다. 그 선택을 존중하되, 검토할 지점이 있으면 알려 준다.\n\n' +
              '[학년] ' + state.grade + '학년\n' +
              '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
-             '[교사가 고른 주요 개념]\n' + picked + '\n' +
-             (already ? '[교사가 이미 고른 관련 개념] ' + already + '\n' : '') +
+             '[교사가 고른 명시된 개념]\n' + picked + '\n' +
+             (already ? '[교사가 이미 고른 기타 개념] ' + already + '\n' : '') +
              '[화면에 이미 있는 후보] ' + pool.join(', ') + '\n\n' +
              '[고른 성취기준]\n' + stds + '\n\n' +
-             '[관련 개념을 고를 때의 주의]\n' + cautions + '\n\n' +
+             '[기타 개념을 고를 때의 주의]\n' + cautions + '\n\n' +
              '[할 일 두 가지]\n' +
-             '1) 이 단원에 어울리는 관련 개념을 3~5개 새로 제안한다. ' +
+             '1) 이 단원에 어울리는 기타 개념을 3~5개 새로 제안한다. ' +
              '화면에 이미 있는 후보와 교사가 이미 고른 것은 빼고, 겹치지 않는 낱말만 낸다. ' +
              '활동명이나 소재명이 아니라 개념 낱말로 낸다.\n' +
-             '2) 교사가 고른 주요 개념이 중심 아이디어·성취기준과 잘 맞물리는지 두세 문장으로 짚는다. ' +
+             '2) 교사가 고른 명시된 개념이 중심 아이디어·성취기준과 잘 맞물리는지 두세 문장으로 짚는다. ' +
              '잘 맞으면 어디가 맞는지 말하고, 아쉬우면 무엇이 빠져 보이는지 말한다. ' +
              '단정하지 말고 교사가 판단할 여지를 남기는 말투로 쓴다. 고쳐야 한다고 명령하지 않는다.\n\n' +
              '[출력] 다음 형태의 JSON만 출력한다.\n' +
-             '{ "related": ["관련 개념", "관련 개념"], "fit": true, "review": "짚어본 내용 두세 문장" }';
+             '{ "related": ["기타 개념", "기타 개념"], "fit": true, "review": "짚어본 내용 두세 문장" }';
     }
 
     function more() {
-      if (!(state.keyConcepts || []).length) { msg('주요 개념을 먼저 골라 주세요.', 'warn'); return; }
+      if (!(state.keyConcepts || []).length) { msg('명시된 개념을 먼저 골라 주세요.', 'warn'); return; }
       var btn = $('#s3-rel [data-act="more"]');
       if (btn) { btn.disabled = true; btn.textContent = '살펴보는 중…'; }
       msg('중심 아이디어와 견주어 보는 중입니다. 15초쯤 걸립니다.', 'info');
@@ -1652,7 +1654,7 @@
 
         paintAll();
         msg(suggested.length
-          ? '관련 개념 ' + suggested.length + '개를 새로 제안했습니다. 아래 점선 칩에서 골라 주세요.'
+          ? '기타 개념 ' + suggested.length + '개를 새로 제안했습니다. 아래 점선 칩에서 골라 주세요.'
           : '새로 제안할 만한 개념이 없습니다. 위 후보에서 골라 주세요.', 'info');
       })['catch'](function (e) {
         paintAll();
@@ -1678,12 +1680,12 @@
       var hard = [], soft = [];
       var kc = (st.keyConcepts || []).length;
       var rc = (st.relatedConcepts || []).length;
-      if (!kc) hard.push('주요 개념을 하나 이상 골라 주세요.');
-      else if (kc > 3) hard.push('주요 개념은 세 개까지만 고를 수 있습니다.');
+      if (!kc) hard.push('명시된 개념을 하나 이상 골라 주세요.');
+      else if (kc > 3) hard.push('명시된 개념은 세 개까지만 고를 수 있습니다.');
       if (!hard.length) {
-        if (!rc) soft.push('관련 개념을 아직 고르지 않았습니다.');
+        if (!rc) soft.push('기타 개념을 아직 고르지 않았습니다.');
         else if (rc > kc * 2) {
-          soft.push('관련 개념이 ' + rc + '개입니다. 주요 개념 하나당 한둘이 자연스럽습니다.');
+          soft.push('기타 개념이 ' + rc + '개입니다. 명시된 개념 하나당 한둘이 자연스럽습니다.');
         }
       }
       return { hard: hard, soft: soft };
@@ -1759,7 +1761,7 @@
 
       var picked = state.keyConcepts || [];
       var h = '<h3 class="block__title"><span class="block__ord">2</span>개념 태그 붙이기</h3>' +
-              '<p class="block__hint">각 갈래가 어떤 주요 개념을 다루는지 표시합니다. ' +
+              '<p class="block__hint">각 갈래가 어떤 명시된 개념을 다루는지 표시합니다. ' +
               '한 갈래에 두 개념이 걸려도 괜찮고, 한 개념이 여러 갈래에 걸쳐도 괜찮습니다.</p>';
 
       arr.forEach(function (item, i) {
@@ -1779,7 +1781,7 @@
         h += '</div></div>';
       });
 
-      // 고른 주요 개념 가운데 어디에도 안 붙은 것을 알려 준다
+      // 고른 명시된 개념 가운데 어디에도 안 붙은 것을 알려 준다
       var used = {};
       arr.forEach(function (it) { (it.concepts || []).forEach(function (c) { used[c] = 1; }); });
       var miss = picked.filter(function (id) { return !used[id]; });
@@ -1787,7 +1789,7 @@
       if (miss.length) {
         h += '<span class="coverage__miss">' + miss.map(koOf).join(' · ') + ' 아직 안 붙음</span>';
       } else if (picked.length) {
-        h += '<span>고르신 주요 개념이 모두 어딘가에 걸려 있습니다.</span>';
+        h += '<span>고르신 명시된 개념이 모두 어딘가에 걸려 있습니다.</span>';
       }
       h += '</div>';
       box.innerHTML = h;
@@ -1814,8 +1816,8 @@
       return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
              '[학년] ' + state.grade + '학년\n' +
              '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
-             '[주요 개념]\n' + kc + '\n' +
-             (rc ? '[관련 개념] ' + rc + '\n' : '') + '\n' +
+             '[명시된 개념]\n' + kc + '\n' +
+             (rc ? '[기타 개념] ' + rc + '\n' : '') + '\n' +
              '[고른 성취기준]\n' + stds + '\n\n' +
              '[할 일] 이 중심 아이디어를 파고드는 탐구 목록(lines of inquiry) 3개를 만든다.\n' +
              '탐구 목록의 조건:\n' +
@@ -1825,7 +1827,7 @@
              '- 활동명이 아니라 탐구할 내용으로 쓴다.\n' +
              '- 셋을 합치면 중심 아이디어 전체가 덮이도록 서로 다른 갈래를 잡는다.\n' +
              '- ' + state.grade + '학년 학생이 읽고 무엇을 알아볼지 짐작할 수 있는 낱말로 쓴다.\n' +
-             '- 각 갈래에 어떤 주요 개념이 걸리는지 위 목록의 영문 id로 표시한다. ' +
+             '- 각 갈래에 어떤 명시된 개념이 걸리는지 위 목록의 영문 id로 표시한다. ' +
              '하나에 두 개념이 걸려도 되고, 셋을 합쳐 고른 개념이 모두 한 번은 나오게 한다.\n\n' +
              '[출력] 다음 형태의 JSON만 출력한다.\n' +
              '{ "lines": [ { "text": "탐구 목록 한 줄", "concepts": ["function"] } ] }';
@@ -1833,7 +1835,7 @@
 
     function generate() {
       if (!state.centralIdea) { msg('2단계에서 중심 아이디어를 먼저 써 주세요.', 'warn'); return; }
-      if (!(state.keyConcepts || []).length) { msg('3단계에서 주요 개념을 먼저 골라 주세요.', 'warn'); return; }
+      if (!(state.keyConcepts || []).length) { msg('3단계에서 명시된 개념을 먼저 골라 주세요.', 'warn'); return; }
 
       var btn = $('#s4-gen [data-act="gen"]');
       if (btn) { btn.disabled = true; btn.textContent = '만드는 중…'; }
@@ -1893,7 +1895,7 @@
       var miss = picked.filter(function (id) { return !used[id]; });
       var h = '<b>탐구 목록 ' + lines().length + '개</b>';
       if (miss.length) h += '<span class="coverage__miss">' + miss.map(koOf).join(' · ') + ' 아직 안 붙음</span>';
-      else if (picked.length) h += '<span>고르신 주요 개념이 모두 어딘가에 걸려 있습니다.</span>';
+      else if (picked.length) h += '<span>고르신 명시된 개념이 모두 어딘가에 걸려 있습니다.</span>';
       box.innerHTML = h;
     }
 
@@ -1936,7 +1938,7 @@
         arr.forEach(function (l) { (l.concepts || []).forEach(function (c) { used[c] = 1; }); });
         var miss = (st.keyConcepts || []).filter(function (id) { return !used[id]; });
         if (miss.length) {
-          soft.push('주요 개념 가운데 ' + miss.map(koOf).join(' · ') + ' 항목이 어느 탐구 목록에도 걸려 있지 않습니다.');
+          soft.push('명시된 개념 가운데 ' + miss.map(koOf).join(' · ') + ' 항목이 어느 탐구 목록에도 걸려 있지 않습니다.');
         }
       }
       return { hard: hard, soft: soft };
@@ -2115,7 +2117,7 @@
       return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
              '[학년] ' + state.grade + '학년\n' +
              '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
-             (rc ? '[관련 개념] ' + rc + '\n' : '') + '\n' +
+             (rc ? '[기타 개념] ' + rc + '\n' : '') + '\n' +
              '[탐구 목록]\n' + body + '\n\n' +
              '[할 일] 탐구 목록마다 다음 두 가지를 만든다.\n\n' +
              '1) 교사 발문 4개. 아래 네 결을 하나씩 만든다. 이 순서가 곧 탐구가 나아가는 순서다.\n' +
@@ -2495,7 +2497,7 @@
       }).join('\n');
       return '[학년] ' + state.grade + '학년\n' +
              '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
-             (kc ? '[주요 개념] ' + kc + '\n' : '') +
+             (kc ? '[명시된 개념] ' + kc + '\n' : '') +
              '[탐구 목록]\n' + lines + '\n\n' +
              '[고른 성취기준]\n' + stds + '\n';
     }
@@ -3560,8 +3562,8 @@
           ((state.subjects || []).length ? ' · ' + state.subjects.join(', ') : '')));
       row('초학문적 주제', esc(themeKo(state.theme)));
       row('중심 아이디어', esc(state.centralIdea));
-      row('주요 개념', esc((state.keyConcepts || []).map(conceptKo).join(' · ')));
-      row('관련 개념', esc((state.relatedConcepts || []).join(', ')));
+      row('명시된 개념', esc((state.keyConcepts || []).map(conceptKo).join(' · ')));
+      row('기타 개념', esc((state.relatedConcepts || []).join(', ')));
       var ls = loi();
       row('탐구 목록', ls.length ? '<ul>' + ls.map(function (l) {
         return '<li>' + esc(l.text) + '</li>';
@@ -3605,7 +3607,7 @@
              '[교과] ' + (state.subjects || []).join(', ') + '\n' +
              '[초학문적 주제] ' + themeKo(state.theme) + '\n' +
              '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
-             '[주요 개념] ' + (state.keyConcepts || []).map(conceptKo).join(', ') + '\n' +
+             '[명시된 개념] ' + (state.keyConcepts || []).map(conceptKo).join(', ') + '\n' +
              '[탐구 목록]\n' + ls + '\n\n' +
              '[할 일] 이 단원이 앞뒤로 무엇과 이어지는지 세 갈래로 적는다.\n' +
              '- priorThemes: 이 학년 학생이 앞서 다뤘을 법한 초학문적 주제 학습과의 연결. ' +
@@ -3824,8 +3826,8 @@
         ['교과', p.subjects.join(', ') + (p.unit ? '  (통합교과 단원: ' + p.unit + ')' : '')],
         ['초학문적 주제', p.theme],
         ['중심 아이디어', p.centralIdea],
-        ['주요 개념', p.keyConcepts.join(' · ')],
-        ['관련 개념', p.relatedConcepts.join(', ')],
+        ['명시된 개념', p.keyConcepts.join(' · ')],
+        ['기타 개념', p.relatedConcepts.join(', ')],
         ['탐구 모델', p.model + (p.modelSource ? '  (' + p.modelSource + ')' : '')],
         ['운영 차시', p.targetHours ? p.targetHours + '차시' : '']
       ]));
