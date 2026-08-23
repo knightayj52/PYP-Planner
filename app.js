@@ -2733,6 +2733,8 @@
     // 학년별 기본 목표 차시. 학교마다 다르므로 화면에서 바꿀 수 있다.
     var DEFAULT_HOURS = { low: 28, high: 32 };
     var HOUR_TOLERANCE = 3;     // 이만큼 넘게 벌어지면 넘어갈 때 확인을 받는다
+    // 단원 하나에서 집중해서 기를 만한 수. 넘으면 나열이 되어 무엇을 길렀는지 흐려진다.
+    var TAG_MAX = 3;
 
     // 모델마다 어느 단계를 도입·반복·마무리에 두는지
     var LAYOUT = {
@@ -2947,7 +2949,8 @@
 
       var h = '<h3 class="block__title"><span class="block__ord">2</span>단계별 활동 배치</h3>' +
               '<p class="block__hint">활동마다 차시와, 그 활동에서 기르는 것을 답니다. ' +
-              'ATL 기능은 초록, 학습자상은 노랑, 실행 유형은 빨강입니다.</p>';
+              'ATL 기능은 초록, 학습자상은 노랑, 실행 유형은 빨강입니다. ' +
+              '한 단원에서는 두세 가지를 골라 되풀이해 기르는 편이 좋습니다.</p>';
 
       p.blocks.forEach(function (b, bi) {
         h += '<div class="blk" data-kind="' + b.kind + '"><div class="blk__head">' +
@@ -3008,13 +3011,20 @@
         (a.atl || []).forEach(function (x) { used.atl[x] = 1; });
         (a.lp || []).forEach(function (x) { used.lp[x] = 1; });
       });
+      var nAtl = Object.keys(used.atl).length;
+      var nLp = Object.keys(used.lp).length;
       h += '<div class="tally"><b>활동 ' + allActs().length + '개 · ' + totalHours() + '차시</b>';
       var kinds = [];
-      if (!Object.keys(used.atl).length) kinds.push('ATL 기능');
-      if (!Object.keys(used.lp).length) kinds.push('학습자상');
-      if (kinds.length) h += '<span class="tally__miss">' + kinds.join(' · ') + ' 태그가 아직 없음</span>';
-      else h += '<span>ATL 기능 ' + Object.keys(used.atl).length + '가지, 학습자상 ' +
-                Object.keys(used.lp).length + '가지가 걸려 있습니다.</span>';
+      if (!nAtl) kinds.push('ATL 기능');
+      if (!nLp) kinds.push('학습자상');
+      if (kinds.length) {
+        h += '<span class="tally__miss">' + kinds.join(' · ') + ' 태그가 아직 없음</span>';
+      } else {
+        h += '<span>ATL 기능 ' + nAtl + '범주 · 학습자상 ' + nLp + '가지</span>';
+        if (nAtl > TAG_MAX || nLp > TAG_MAX) {
+          h += '<span class="tally__miss">' + TAG_MAX + '가지 안으로 좁히면 좋습니다</span>';
+        }
+      }
       h += '</div>';
 
       box.innerHTML = h;
@@ -3083,11 +3093,18 @@
       }
 
       p2 += '\n활동마다 무엇을 기르는지 아래 목록의 영문 id로 표시한다.\n' +
-            '- atl (기르는 기능, 0~2개): ' + atl + '\n' +
-            '- lp (드러나는 학습자상, 0~2개): ' + lp + '\n' +
-            '- action (실행 유형, 0~1개. 실제 행동으로 이어지는 활동에만 붙인다): ' + act + '\n' +
-            '전부 채우려 애쓰지 않는다. 그 활동에서 실제로 길러지는 것만 붙인다.\n' +
-            '다만 단원 전체로 보아 ATL 다섯 범주 가운데 셋 이상, 학습자상 가운데 셋 이상이 어딘가에는 나오게 한다.\n\n' +
+            '- atl (기르는 기능): ' + atl + '\n' +
+            '- lp (드러나는 학습자상): ' + lp + '\n' +
+            '- action (실행 유형. 실제 행동으로 이어지는 활동에만 붙인다): ' + act + '\n\n' +
+            '태그를 붙일 때의 원칙:\n' +
+            '- 먼저 이 단원에서 집중해서 기를 것을 정한다. ' +
+            'ATL은 다섯 범주 가운데 2~3범주만, 학습자상은 열 가지 가운데 2~3가지만 고른다. ' +
+            '그 범위 밖의 것은 쓰지 않는다.\n' +
+            '- 고른 것을 여러 활동에 되풀이해서 붙인다. 같은 학습자상이 서너 번 나와도 좋다. ' +
+            '되풀이되어야 그 단원이 무엇을 기르는 단원인지 드러난다.\n' +
+            '- 활동마다 태그를 억지로 채우지 않는다. 태그가 없는 활동이 있어도 된다.\n' +
+            '- 한 활동에는 ATL과 학습자상을 각각 하나씩만 붙인다.\n' +
+            '- 실행 유형은 단원 전체에서 한둘이면 충분하다.\n\n' +
             '공통 조건:\n' +
             '- ' + state.grade + '학년 교실에서 할 수 있는 활동으로 쓴다.\n' +
             '- 평서형으로 끝낸다. 존댓말 어미를 쓰지 않는다.\n' +
@@ -3353,8 +3370,18 @@
             });
           });
         });
-        if (!Object.keys(used.atl).length) soft.push('ATL 기능 태그가 어느 활동에도 없습니다.');
-        if (!Object.keys(used.lp).length) soft.push('학습자상 태그가 어느 활동에도 없습니다.');
+        var nAtl = Object.keys(used.atl).length;
+        var nLp = Object.keys(used.lp).length;
+        if (!nAtl) soft.push('ATL 기능 태그가 어느 활동에도 없습니다.');
+        else if (nAtl > TAG_MAX) {
+          soft.push('ATL 기능이 ' + nAtl + '범주 걸려 있습니다. ' +
+                    TAG_MAX + '범주 안으로 좁히면 무엇을 기르는 단원인지 또렷해집니다.');
+        }
+        if (!nLp) soft.push('학습자상 태그가 어느 활동에도 없습니다.');
+        else if (nLp > TAG_MAX) {
+          soft.push('학습자상이 ' + nLp + '가지 걸려 있습니다. ' +
+                    TAG_MAX + '가지 안으로 좁히면 무엇을 기르는 단원인지 또렷해집니다.');
+        }
       }
       return { hard: hard, soft: soft };
     });
