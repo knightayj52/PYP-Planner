@@ -1005,6 +1005,60 @@ html[data-theme="dark"] .vitem__go{color:var(--pine)}
   .sum__key{width:auto}
 }
 
+/* ---- 7단계 실행: 학생이 정하는 것이므로 활동 배치와 층을 나눈다 ---- */
+.actionwrap{
+  margin-top:26px;padding-top:22px;
+  border-top:2px solid var(--line);
+}
+.actionwrap .block__hint{max-width:62ch}
+.atype{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:9px;margin-bottom:13px}
+.atype__btn{
+  display:block;width:100%;text-align:left;
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 14px;cursor:pointer;
+}
+.atype__btn:hover{border-color:var(--ink-3)}
+.atype__btn[aria-pressed="true"]{
+  border-color:var(--alert);background:var(--alert-wash);
+  box-shadow:inset 0 0 0 1px var(--alert);
+}
+.atype__ko{display:block;font-size:15px;font-weight:700;margin-bottom:2px}
+.atype__en{display:block;font-size:12px;color:var(--ink-3);margin-bottom:5px}
+.atype__why{display:block;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+
+.agroup{margin-bottom:14px}
+.agroup__head{
+  display:flex;align-items:baseline;gap:8px;margin-bottom:8px;
+  font-size:14.5px;font-weight:700;
+}
+.agroup__en{font-size:12px;font-weight:600;color:var(--ink-3)}
+.aidea{display:flex;gap:9px;align-items:flex-start;margin-bottom:7px}
+.aidea__in{
+  flex:1;min-width:0;min-height:38px;padding:8px 11px;
+  background:var(--paper);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-size:14.5px;line-height:1.5;resize:vertical;overflow:hidden;
+}
+.aidea__in:focus{outline:2px solid var(--pine);border-color:var(--pine)}
+.aidea__del{
+  flex:none;background:none;border:0;cursor:pointer;
+  color:var(--ink-3);font-size:16px;line-height:1;padding:8px 5px;border-radius:5px;
+}
+.aidea__del:hover{color:var(--alert);background:var(--alert-wash)}
+
+.moment{
+  border-left:3px solid var(--alert);
+  background:var(--alert-wash);
+  border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  padding:11px 14px;margin-bottom:8px;
+}
+.moment__where{
+  font-size:12px;font-weight:700;color:var(--alert);
+  margin-bottom:3px;
+}
+.moment__text{font-size:14px;color:var(--ink-2);line-height:1.55}
+
 /* ============================================================
    반응형
    ============================================================ */
@@ -1212,10 +1266,11 @@ html[data-theme="dark"] .vitem__go{color:var(--pine)}
       <div class="step__head">
         <p class="step__eyebrow">단계 7 / 8</p>
         <h2 class="step__title" id="t7">탐구 과정 배열하기</h2>
-        <p class="step__hint">탐구 모델을 하나 고르고 단계마다 활동을 배치합니다. 활동에 ATL 기능, 학습자상, 실행 유형을 함께 답니다.</p>
+        <p class="step__hint">탐구 모델을 하나 고르고 단계마다 활동을 배치합니다. 활동에 ATL 기능과 학습자상을 함께 달고, 마지막으로 학생이 스스로 할 실행의 문을 열어 둡니다.</p>
       </div>
       <div class="block" id="s7-model"></div>
       <div class="block" id="s7-stages"></div>
+      <div class="actionwrap" id="s7-action"></div>
     </section>
 
     <section class="step" id="step-8" data-step="8" aria-labelledby="t8">

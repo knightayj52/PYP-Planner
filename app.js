@@ -68,6 +68,7 @@
 
     inquiryModel: null,         // 7  'murdoch5' | 'marschallFrench7'
     inquiryPlan: null,          // { targetHours, blocks: [ { kind, loi, stages: [ { id, acts[] } ] } ] }
+    action: null,               // { types: [], ideas: { 유형id: [문장] }, moments: [ { where, text } ] }
 
     connections: {              // 8
       priorThemes: '',
@@ -3041,9 +3042,206 @@
       });
     }
 
+    /* ---- 실행 ----
+     * 실행은 학생이 스스로 정하는 것이라 미리 짤 수 없다.
+     * 교사는 어떤 실행이 나올 만한지 그려 두고, 아이가 말을 꺼냈을 때 받아 줄 준비를 한다.
+     * 그래서 차시를 매기지 않고, 활동 배치와 층을 나눠 놓는다.
+     */
+    function A7() {
+      if (!state.action || typeof state.action !== 'object') {
+        state.action = { types: [], ideas: {}, moments: [] };
+      }
+      var a = state.action;
+      if (!Array.isArray(a.types)) a.types = [];
+      if (!a.ideas || typeof a.ideas !== 'object') a.ideas = {};
+      if (!Array.isArray(a.moments)) a.moments = [];
+      return a;
+    }
+    function actOf(id) {
+      var hit = null;
+      actList().forEach(function (x) { if (x.id === id) hit = x; });
+      return hit;
+    }
+
+    function paintAction() {
+      var box = $('#s7-action');
+      if (!state.inquiryModel) { box.innerHTML = ''; return; }
+      var a = A7();
+
+      var h = '<h3 class="block__title"><span class="block__ord">3</span>실행의 문 열어두기</h3>' +
+              '<p class="block__hint">실행은 학생이 스스로 정하는 것이라 미리 짜둘 수 없습니다. ' +
+              '다만 어떤 실행이 나올 만한지 그려두면, 아이가 그런 말을 꺼냈을 때 바로 받아줄 수 있습니다. ' +
+              '위 차시에는 넣지 않습니다.</p>' +
+              '<div class="atype">';
+
+      actList().forEach(function (x) {
+        var on = a.types.indexOf(x.id) >= 0;
+        h += '<button class="atype__btn" type="button" data-act="atype" data-v="' + esc(x.id) + '"' +
+             ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
+             '<span class="atype__ko">' + esc(x.ko) + '</span>' +
+             '<span class="atype__en">' + esc(x.en) + '</span>' +
+             '<span class="atype__why">' + esc(x.description) + '</span></button>';
+      });
+      h += '</div>';
+
+      if (!a.types.length) {
+        h += '<p class="block__hint" style="margin-left:0">' +
+             '이 단원에서 나올 만한 실행 유형을 골라 주세요. 여러 개를 고르셔도 됩니다.</p>';
+        box.innerHTML = h;
+        return;
+      }
+
+      h += '<div class="rowbtns">' +
+           '<button class="btn" type="button" data-act="agen">이 단원에 맞는 실행 예시 받기</button>' +
+           '</div><p class="notice notice--info" id="s7-amsg" hidden></p>';
+
+      a.types.forEach(function (id) {
+        var x = actOf(id);
+        if (!x) return;
+        var list = a.ideas[id] || [];
+        h += '<div class="agroup"><p class="agroup__head">' + esc(x.ko) +
+             '<span class="agroup__en">' + esc(x.en) + '</span></p>';
+        list.forEach(function (v, i) {
+          h += '<div class="aidea">' +
+               '<textarea class="aidea__in" data-act="aedit" data-g="' + esc(id) + '" data-i="' + i + '" ' +
+               'placeholder="학생이 실제로 해볼 만한 일">' + esc(v) + '</textarea>' +
+               '<button class="aidea__del" type="button" data-act="adel" data-g="' + esc(id) + '" data-i="' + i + '" ' +
+               'aria-label="지우기">×</button></div>';
+        });
+        h += '<button class="qadd" type="button" data-act="aadd" data-g="' + esc(id) + '">예시 추가</button></div>';
+      });
+
+      if (a.moments.length) {
+        h += '<p class="block__sub">실행 이야기가 나올 만한 자리</p>' +
+             '<p class="block__hint" style="margin-left:0">' +
+             '이 대목을 지날 때 아이들이 무엇을 해보자고 말할 수 있습니다. 그때 받아 주시면 됩니다.</p>';
+        a.moments.forEach(function (m2) {
+          h += '<div class="moment"><p class="moment__where">' + esc(m2.where) + '</p>' +
+               '<p class="moment__text">' + esc(m2.text) + '</p></div>';
+        });
+      }
+
+      box.innerHTML = h;
+      grow(box);
+    }
+
+    function toggleAType(id) {
+      var a = A7();
+      var at = a.types.indexOf(id);
+      if (at >= 0) { a.types.splice(at, 1); delete a.ideas[id]; }
+      else a.types.push(id);
+      paintAll();
+    }
+    function addIdea(gid) {
+      var a = A7();
+      if (!Array.isArray(a.ideas[gid])) a.ideas[gid] = [];
+      a.ideas[gid].push('');
+      paintAll();
+      var boxes = $$('#s7-action [data-act="aedit"][data-g="' + gid + '"]');
+      if (boxes.length) boxes[boxes.length - 1].focus();
+    }
+    function delIdea(gid, i) {
+      var a = A7();
+      var list = a.ideas[gid] || [];
+      if (i < 0 || i >= list.length) return;
+      list.splice(i, 1);
+      paintAll();
+    }
+
+    function buildActionPrompt() {
+      var a = A7();
+      var m = modelOf(state.inquiryModel);
+      var p = plan();
+      var picked = a.types.map(function (id) {
+        var x = actOf(id);
+        return x ? ('- ' + x.id + ' (' + x.ko + '): ' + x.description) : ('- ' + id);
+      }).join('\n');
+
+      var flow = [];
+      (p.blocks || []).forEach(function (b) {
+        (b.stages || []).forEach(function (sl) {
+          var st = stageOf(m, sl.id);
+          (sl.acts || []).forEach(function (x) {
+            if (String(x.text || '').trim()) {
+              flow.push('- [' + blockKo(b).split(' — ')[0] + ' · ' + (st ? st.ko : sl.id) + '] ' + x.text);
+            }
+          });
+        });
+      });
+
+      var asm = state.assessment || {};
+      return '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+             '[학년] ' + state.grade + '학년\n' +
+             '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
+             (asm.summative ? '[총괄평가 과제] ' + String(asm.summative).replace(/\n/g, ' ') + '\n' : '') + '\n' +
+             '[배치한 활동]\n' + flow.join('\n') + '\n\n' +
+             '[교사가 고른 실행 유형]\n' + picked + '\n\n' +
+             '[실행이 무엇인지] 실행(action)은 학생이 배운 것을 자기 삶에 옮기는 일이다. ' +
+             '교사가 시켜서 하는 과제가 아니라 학생이 스스로 하겠다고 정하는 일이며, 점수를 매기지 않는다.\n\n' +
+             '[할 일 두 가지]\n' +
+             '1) 고른 유형마다 이 단원을 마친 ' + state.grade + '학년 학생이 실제로 해볼 만한 일을 3개씩 낸다.\n' +
+             '   - 교실과 학교 안에서, 아이 힘으로 할 수 있는 크기의 일로 쓴다. ' +
+             '어른이 대신 해주어야 하는 일은 쓰지 않는다.\n' +
+             '   - 총괄평가 과제와 같거나 비슷한 것을 쓰지 않는다. ' +
+             '총괄평가는 교사가 정한 평가이고 실행은 학생이 정하는 일이라 서로 다르다.\n' +
+             '   - 언제 어디서 무엇을 하는지 알 수 있게 한 문장으로 쓴다. ' +
+             '보기: 아침 활동 시간에 친구들에게 내 의견을 전한다.\n' +
+             '2) 위 활동 목록에서 학생이 실행을 꺼낼 만한 자리를 2~3군데 짚는다.\n' +
+             '   - where 에는 활동 앞에 붙은 대괄호 안의 자리를 그대로 적는다.\n' +
+             '   - text 에는 그 대목에서 아이가 무엇을 하고 싶어질 만한지 한 문장으로 쓴다.\n\n' +
+             '공통 조건:\n' +
+             '- 평서형으로 끝낸다. 존댓말 어미를 쓰지 않는다.\n' +
+             '- 고유명사와 특정 지명·기관명을 넣지 않는다.\n\n' +
+             '[출력] 다음 형태의 JSON만 출력한다. ideas 의 열쇠는 위 유형의 영문 id 를 그대로 쓴다.\n' +
+             '{ "ideas": { "' + a.types[0] + '": ["예시", "예시", "예시"] }, ' +
+             '"moments": [ { "where": "단원 닫기 · 전이하기", "text": "…" } ] }';
+    }
+
+    function askAction() {
+      var a = A7();
+      if (!a.types.length) { amsg('실행 유형을 먼저 골라 주세요.', 'warn'); return; }
+      if (!allActs().length) { amsg('위에서 활동을 먼저 배치해 주세요.', 'warn'); return; }
+
+      var btn = $('#s7-action [data-act="agen"]');
+      if (btn) { btn.disabled = true; btn.textContent = '살펴보는 중…'; }
+      amsg('탐구 흐름을 훑어 실행 예시를 찾는 중입니다. 20초쯤 걸립니다.', 'info');
+
+      callGemini(buildActionPrompt()).then(function (res) {
+        var got = (res && res.ideas) || {};
+        a.types.forEach(function (id) {
+          var list = got[id];
+          if (Array.isArray(list)) {
+            a.ideas[id] = list.map(function (v) { return String(v || '').trim(); })
+                              .filter(function (v) { return v; }).slice(0, 5);
+          }
+        });
+        a.moments = ((res && res.moments) || [])
+          .filter(function (x) { return x && x.text; })
+          .map(function (x) { return { where: String(x.where || '').trim(), text: String(x.text).trim() }; })
+          .slice(0, 4);
+        paintAll();
+        var n2 = 0;
+        a.types.forEach(function (id) { n2 += (a.ideas[id] || []).length; });
+        amsg(n2 ? '실행 예시 ' + n2 + '개를 찾았습니다. 우리 반 아이들이 할 만한 일로 고쳐 주세요.'
+                : '예시를 찾지 못했습니다. 다시 눌러 주세요.', n2 ? 'info' : 'warn');
+      })['catch'](function (e) {
+        paintAll();
+        amsg(msgOf(e), 'stop');
+      });
+    }
+
+    function amsg(text, tone) {
+      var el = $('#s7-amsg');
+      if (!el) return;
+      if (!text) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = text;
+      el.className = 'notice notice--' + (tone || 'info');
+    }
+
     function paintAll() {
       if (!fw) return;
-      paintModel(); paintStages();
+      paintModel(); paintStages(); paintAction();
       saveDraft();
     }
 
@@ -3311,11 +3509,23 @@
         if (act === 'tag' || act === 'untag') {
           toggleTag(el.getAttribute('data-g'), bi, si, i, el.getAttribute('data-v'));
         }
+        if (act === 'atype') toggleAType(el.getAttribute('data-v'));
+        if (act === 'agen') askAction();
+        if (act === 'aadd') addIdea(el.getAttribute('data-g'));
+        if (act === 'adel') delIdea(el.getAttribute('data-g'), i);
       });
       root.addEventListener('input', function (ev) {
         var t = ev.target;
         if (!t || !t.matches) return;
-        if (t.matches('[data-act="edit"]')) {
+        if (t.matches('[data-act="aedit"]')) {
+          var a2 = A7();
+          var gid = t.getAttribute('data-g');
+          if (!Array.isArray(a2.ideas[gid])) a2.ideas[gid] = [];
+          a2.ideas[gid][Number(t.getAttribute('data-i'))] = t.value;
+          saveDraft();
+          t.style.height = 'auto';
+          t.style.height = (t.scrollHeight + 2) + 'px';
+        } else if (t.matches('[data-act="edit"]')) {
           var sl = slotAt(Number(t.getAttribute('data-b')), Number(t.getAttribute('data-s')));
           var a = sl && sl.acts[Number(t.getAttribute('data-i'))];
           if (a) { a.text = t.value; saveDraft(); }
@@ -3570,6 +3780,13 @@
       }).join('') + '</ul>' : '');
       row('성취기준', esc((state.standards || []).length ? (state.standards.length + '개') : ''));
       row('탐구 과정', esc(m ? (m.ko + ' · 활동 ' + (p ? '' : '') + hours + '차시') : ''));
+      var ac = state.action;
+      var atypes = (ac && ac.types) || [];
+      row('실행', esc(atypes.map(function (id) {
+        var x = null;
+        ((fw && fw.actionTypes) || []).forEach(function (y) { if (y.id === id) x = y; });
+        return x ? x.ko : id;
+      }).join(' · ')));
       h += '</div>';
 
       h += '<div class="rowbtns">' +
@@ -3714,6 +3931,18 @@
         modelSource: m ? m.source : '',
         targetHours: (p && p.targetHours) || 0,
         blocks: blocks,
+        action: (function () {
+          var ac = state.action;
+          if (!ac || !Array.isArray(ac.types) || !ac.types.length) return null;
+          var groups = [];
+          ac.types.forEach(function (id) {
+            var x = null;
+            ((fw && fw.actionTypes) || []).forEach(function (y) { if (y.id === id) x = y; });
+            var list = ((ac.ideas || {})[id] || []).filter(function (v) { return t(v); });
+            groups.push({ ko: x ? x.ko : id, en: x ? x.en : '', ideas: list });
+          });
+          return { groups: groups, moments: (ac.moments || []).filter(function (m2) { return t(m2.text); }) };
+        })(),
         connections: { priorThemes: t(c.priorThemes), otherSubjects: t(c.otherSubjects), localGlobal: t(c.localGlobal) }
       };
     }
@@ -3903,10 +4132,35 @@
         out.push(gap());
       });
 
-      /* 6. 연결되는 맥락 */
+      /* 6. 실행 */
+      var sec = 6;
+      if (p.action && p.action.groups.length) {
+        out.push(h2(sec + '. 실행'));
+        out.push(new d.Paragraph({
+          children: [new d.TextRun({
+            text: '실행은 학생이 스스로 정하는 일이며 차시에 넣지 않는다. 아래는 나올 만한 일을 미리 그려 둔 것이다.',
+            size: 18, color: '666666'
+          })],
+          spacing: { after: 100 }
+        }));
+        var arows = p.action.groups
+          .filter(function (g) { return g.ideas.length; })
+          .map(function (g) { return [g.ko, '• ' + g.ideas.join('\n• ')]; });
+        if (arows.length) out.push(kv(arows));
+        if (p.action.moments.length) {
+          out.push(h3('실행 이야기가 나올 만한 자리'));
+          out.push(table(['자리', '내용'],
+            p.action.moments.map(function (m2) { return [m2.where, m2.text]; }),
+            [2600, 6400]));
+        }
+        out.push(gap());
+        sec = 7;
+      }
+
+      /* 7. 연결되는 맥락 */
       var cn = p.connections;
       if (cn.priorThemes || cn.otherSubjects || cn.localGlobal) {
-        out.push(h2('6. 연결되는 맥락'));
+        out.push(h2(sec + '. 연결되는 맥락'));
         out.push(kv([
           ['과거 주제 학습과의 연결', cn.priorThemes],
           ['다른 교과와의 연결', cn.otherSubjects],
