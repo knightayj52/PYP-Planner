@@ -67,7 +67,7 @@
     },
 
     inquiryModel: null,         // 7  'murdoch5' | 'marschallFrench7'
-    inquiryStages: {},          // { 단계id: [ { text, atl[], lp[], action[] } ] }
+    inquiryPlan: null,          // { targetHours, blocks: [ { kind, loi, stages: [ { id, acts[] } ] } ] }
 
     connections: {              // 8
       priorThemes: '',
@@ -2718,13 +2718,35 @@
 
   /* ============================================================
    * 7단계 — 탐구 과정
-   *   모델을 하나 고르고 단계마다 활동을 배치한다.
-   *   ATL·학습자상·실행 유형은 활동마다 붙인다(어느 활동에서 기르는지가 드러나야 한다).
-   *   모델을 바꾸면 단계 구성이 달라 활동이 이월되지 않는다.
+   *   UOI 하나 안에서 탐구 과정이 LOI마다 되풀이된다.
+   *     [도입]   단원을 여는 단계        (기본 1묶음)
+   *     [LOI n]  갈래마다 도는 단계      (탐구 목록 수만큼)
+   *     [마무리] 총괄로 수렴하는 단계    (기본 1묶음)
+   *   기본 틀을 주되 교사가 단계를 더하고 뺄 수 있다.
+   *   활동마다 차시를 적고, 목표 차시와의 차이를 실시간으로 보여 준다.
    * ============================================================ */
   var S7 = (function () {
     var fw = null;
-    var open = {};   // 어떤 활동에서 태그 고르개를 펼쳤는지
+    var open = {};              // 태그 고르개를 펼친 활동
+    var addOpen = {};           // 단계 더하기 고르개를 펼친 묶음
+
+    // 학년별 기본 목표 차시. 학교마다 다르므로 화면에서 바꿀 수 있다.
+    var DEFAULT_HOURS = { low: 28, high: 32 };
+    var HOUR_TOLERANCE = 3;     // 이만큼 넘게 벌어지면 넘어갈 때 확인을 받는다
+
+    // 모델마다 어느 단계를 도입·반복·마무리에 두는지
+    var LAYOUT = {
+      murdoch5: {
+        intro: ['tuningIn'],
+        loop: ['findingOut', 'sortingOut'],
+        outro: ['goingFurther', 'reflectingActing']
+      },
+      marschallFrench7: {
+        intro: ['engage', 'focus'],
+        loop: ['investigate', 'organize', 'generalize'],
+        outro: ['transfer', 'reflect']
+      }
+    };
 
     function esc(v) {
       return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
@@ -2745,6 +2767,11 @@
       models().forEach(function (m) { if (m.id === id) hit = m; });
       return hit;
     }
+    function stageOf(m, sid) {
+      var hit = null;
+      (m ? m.stages : []).forEach(function (st) { if (st.id === sid) hit = st; });
+      return hit;
+    }
     function atlList() { return (fw && fw.atl) || []; }
     function lpList() { return (fw && fw.learnerProfile) || []; }
     function actList() { return (fw && fw.actionTypes) || []; }
@@ -2753,21 +2780,84 @@
       list.forEach(function (x) { if (x.id === id) hit = x.ko; });
       return hit;
     }
-    function bag() {
-      if (!state.inquiryStages || Array.isArray(state.inquiryStages)) state.inquiryStages = {};
-      return state.inquiryStages;
+    function loi() {
+      return (state.linesOfInquiry || []).filter(function (l) { return String(l.text || '').trim(); });
     }
-    function acts(stageId) {
-      var b = bag();
-      if (!Array.isArray(b[stageId])) b[stageId] = [];
-      return b[stageId];
+    function defaultHours() {
+      return (state.grade && state.grade <= 2) ? DEFAULT_HOURS.low : DEFAULT_HOURS.high;
+    }
+
+    /* ---- 계획 뼈대 ---- */
+    /** 모델과 탐구 목록에 맞춰 기본 틀을 만든다. 기존 활동은 버린다. */
+    function freshPlan(modelId) {
+      var lay = LAYOUT[modelId];
+      if (!lay) return null;
+      var blocks = [];
+      blocks.push({ kind: 'intro', loi: -1, stages: lay.intro.map(function (id) { return { id: id, acts: [] }; }) });
+      loi().forEach(function (l, i) {
+        blocks.push({ kind: 'loop', loi: i, stages: lay.loop.map(function (id) { return { id: id, acts: [] }; }) });
+      });
+      blocks.push({ kind: 'outro', loi: -1, stages: lay.outro.map(function (id) { return { id: id, acts: [] }; }) });
+      return { targetHours: defaultHours(), blocks: blocks };
+    }
+
+    /** 지금 계획을 돌려준다. 탐구 목록이 바뀌었으면 묶음 수를 맞춘다. */
+    function plan() {
+      var p = state.inquiryPlan;
+      if (!state.inquiryModel) return null;
+      if (!p || !Array.isArray(p.blocks) || !p.blocks.length) {
+        p = state.inquiryPlan = freshPlan(state.inquiryModel);
+        return p;
+      }
+      var lay = LAYOUT[state.inquiryModel];
+      var want = loi().length;
+      var loops = p.blocks.filter(function (b) { return b.kind === 'loop'; });
+      if (loops.length !== want) {
+        // 갈래가 늘면 기본 단계로 묶음을 더하고, 줄면 뒤에서 덜어 낸다.
+        var head = p.blocks.filter(function (b) { return b.kind === 'intro'; });
+        var tail = p.blocks.filter(function (b) { return b.kind === 'outro'; });
+        while (loops.length < want) {
+          loops.push({ kind: 'loop', loi: loops.length,
+                       stages: lay.loop.map(function (id) { return { id: id, acts: [] }; }) });
+        }
+        loops.length = want;
+        loops.forEach(function (b, i) { b.loi = i; });
+        p.blocks = head.concat(loops, tail);
+      }
+      if (!p.targetHours) p.targetHours = defaultHours();
+      return p;
+    }
+
+    function blockKo(b) {
+      if (b.kind === 'intro') return '단원 열기';
+      if (b.kind === 'outro') return '단원 닫기';
+      var l = loi()[b.loi];
+      return '탐구 목록 ' + (b.loi + 1) + (l ? ' — ' + l.text : '');
+    }
+    function hoursOf(list) {
+      var sum = 0;
+      (list || []).forEach(function (a) { sum += Number(a.hours) || 0; });
+      return sum;
+    }
+    function blockHours(b) {
+      var sum = 0;
+      (b.stages || []).forEach(function (st) { sum += hoursOf(st.acts); });
+      return sum;
+    }
+    function totalHours() {
+      var p = plan();
+      if (!p) return 0;
+      var sum = 0;
+      p.blocks.forEach(function (b) { sum += blockHours(b); });
+      return sum;
     }
     function allActs() {
-      var out = [];
-      var m = modelOf(state.inquiryModel);
-      if (!m) return out;
-      m.stages.forEach(function (st) {
-        acts(st.id).forEach(function (a) { if (String(a.text || '').trim()) out.push(a); });
+      var p = plan(), out = [];
+      if (!p) return out;
+      p.blocks.forEach(function (b) {
+        (b.stages || []).forEach(function (st) {
+          (st.acts || []).forEach(function (a) { if (String(a.text || '').trim()) out.push(a); });
+        });
       });
       return out;
     }
@@ -2793,35 +2883,42 @@
       });
       h += '</div>';
 
-      if (state.inquiryModel) {
-        h += '<div class="rowbtns">' +
+      var p = plan();
+      if (p) {
+        var total = totalHours();
+        var left = p.targetHours - total;
+        h += '<div class="hours"><label class="hours__key" for="s7-target">목표 차시</label>' +
+             '<input class="hours__in" id="s7-target" type="number" min="1" max="200" ' +
+             'data-act="target" value="' + p.targetHours + '">' +
+             '<span class="hours__now">배치 <b>' + total + '</b>차시</span>' +
+             '<span class="hours__gap" data-t="' + (left === 0 ? 'ok' : (left > 0 ? 'less' : 'over')) + '">' +
+             (left === 0 ? '딱 맞습니다' : (left > 0 ? left + '차시 남음' : (-left) + '차시 초과')) +
+             '</span></div>' +
+             '<p class="block__hint" style="margin-left:0">' +
+             '탐구 과정은 탐구 목록마다 되풀이됩니다. 아래 기본 틀에서 단계를 더하거나 뺄 수 있습니다.</p>' +
+             '<div class="rowbtns">' +
              '<button class="btn btn--primary" type="button" data-act="gen">' +
-             (allActs().length ? '다시 받기' : '단계별 활동 받기') + '</button></div>';
+             (allActs().length ? '다시 받기' : '단계별 활동 받기') + '</button>' +
+             '<button class="btn" type="button" data-act="reset">기본 틀로 되돌리기</button>' +
+             '</div>';
       }
       h += '<p class="notice notice--info" id="s7-msg" hidden></p>';
       $('#s7-model').innerHTML = h;
     }
 
-    function tagRow(sid, i, a) {
-      var h = '<div class="act__tags"><span class="act__label">기른다</span>';
-      (a.atl || []).forEach(function (id) {
-        h += '<button class="minitag" type="button" aria-pressed="true" data-act="untag" ' +
-             'data-g="atl" data-s="' + esc(sid) + '" data-i="' + i + '" data-v="' + esc(id) + '">' +
-             esc(koIn(atlList(), id)) + '</button>';
-      });
-      (a.lp || []).forEach(function (id) {
-        h += '<button class="minitag minitag--lp" type="button" aria-pressed="true" data-act="untag" ' +
-             'data-g="lp" data-s="' + esc(sid) + '" data-i="' + i + '" data-v="' + esc(id) + '">' +
-             esc(koIn(lpList(), id)) + '</button>';
-      });
-      (a.action || []).forEach(function (id) {
-        h += '<button class="minitag minitag--at" type="button" aria-pressed="true" data-act="untag" ' +
-             'data-g="action" data-s="' + esc(sid) + '" data-i="' + i + '" data-v="' + esc(id) + '">' +
-             esc(koIn(actList(), id)) + '</button>';
-      });
-      var key = sid + ':' + i;
-      h += '<button class="act__more" type="button" data-act="more" data-s="' + esc(sid) + '" data-i="' + i + '">' +
-           (open[key] ? '닫기' : '태그 고르기') + '</button></div>';
+    function tagRow(bi, si, i, a) {
+      var key = bi + ':' + si + ':' + i;
+      var h = '<div class="act__tags"><span class="act__label">이 활동에서 기르는 것</span>';
+      [['atl', atlList(), ''], ['lp', lpList(), ' minitag--lp'], ['action', actList(), ' minitag--at']]
+        .forEach(function (g) {
+          (a[g[0]] || []).forEach(function (id) {
+            h += '<button class="minitag' + g[2] + '" type="button" aria-pressed="true" data-act="untag" ' +
+                 'data-g="' + g[0] + '" data-b="' + bi + '" data-s="' + si + '" data-i="' + i + '" ' +
+                 'data-v="' + esc(id) + '">' + esc(koIn(g[1], id)) + '</button>';
+          });
+        });
+      h += '<button class="act__more" type="button" data-act="more" data-b="' + bi + '" data-s="' + si +
+           '" data-i="' + i + '">' + (open[key] ? '닫기' : '태그 고르기') + '</button></div>';
 
       if (open[key]) {
         h += '<div class="picker">';
@@ -2832,7 +2929,7 @@
           g[2].forEach(function (x) {
             var onNow = ((a[g[0]] || []).indexOf(x.id) >= 0);
             h += '<button class="minitag' + g[3] + '" type="button" aria-pressed="' + (onNow ? 'true' : 'false') + '" ' +
-                 'data-act="tag" data-g="' + g[0] + '" data-s="' + esc(sid) + '" data-i="' + i + '" ' +
+                 'data-act="tag" data-g="' + g[0] + '" data-b="' + bi + '" data-s="' + si + '" data-i="' + i + '" ' +
                  'data-v="' + esc(x.id) + '">' + esc(x.ko) + '</button>';
           });
           h += '</div>';
@@ -2845,41 +2942,73 @@
     function paintStages() {
       var box = $('#s7-stages');
       var m = modelOf(state.inquiryModel);
-      if (!m) { box.innerHTML = ''; return; }
+      var p = plan();
+      if (!m || !p) { box.innerHTML = ''; return; }
 
       var h = '<h3 class="block__title"><span class="block__ord">2</span>단계별 활동 배치</h3>' +
-              '<p class="block__hint">활동마다 무엇을 기르는지 태그를 답니다. ' +
-              'ATL 기능은 초록, 학습자상은 노랑, 실행 유형은 빨강으로 표시됩니다.</p>';
+              '<p class="block__hint">활동마다 차시와, 그 활동에서 기르는 것을 답니다. ' +
+              'ATL 기능은 초록, 학습자상은 노랑, 실행 유형은 빨강입니다.</p>';
 
-      m.stages.forEach(function (st, si) {
-        h += '<div class="stage"><div class="stage__head">' +
-             '<span class="stage__ord">' + (si + 1) + '</span>' +
-             '<span class="stage__ko">' + esc(st.ko) + '</span>' +
-             '<span class="stage__en">' + esc(st.en) + '</span></div>' +
-             '<ul class="stage__goals">';
-        (st.goals || []).forEach(function (g) { h += '<li>' + esc(g) + '</li>'; });
-        h += '</ul>';
+      p.blocks.forEach(function (b, bi) {
+        h += '<div class="blk" data-kind="' + b.kind + '"><div class="blk__head">' +
+             '<span class="blk__ko">' + esc(blockKo(b)) + '</span>' +
+             '<span class="blk__hours">' + blockHours(b) + '차시</span></div>';
 
-        acts(st.id).forEach(function (a, i) {
-          h += '<div class="act"><div class="act__row">' +
-               '<textarea class="act__in" data-act="edit" data-s="' + esc(st.id) + '" data-i="' + i + '" ' +
-               'placeholder="이 단계에서 할 활동">' + esc(a.text || '') + '</textarea>' +
-               '<button class="act__del" type="button" data-act="del" data-s="' + esc(st.id) + '" data-i="' + i + '" ' +
-               'aria-label="지우기">×</button></div>' +
-               tagRow(st.id, i, a) + '</div>';
+        (b.stages || []).forEach(function (sl, si) {
+          var st = stageOf(m, sl.id);
+          if (!st) return;
+          h += '<div class="stage"><div class="stage__head">' +
+               '<span class="stage__ord">' + (si + 1) + '</span>' +
+               '<span class="stage__ko">' + esc(st.ko) + '</span>' +
+               '<span class="stage__en">' + esc(st.en) + '</span>' +
+               '<button class="stage__drop" type="button" data-act="dropStage" data-b="' + bi + '" data-s="' + si + '">단계 빼기</button>' +
+               '</div><ul class="stage__goals">';
+          (st.goals || []).forEach(function (g) { h += '<li>' + esc(g) + '</li>'; });
+          h += '</ul>';
+
+          (sl.acts || []).forEach(function (a, i) {
+            h += '<div class="act"><div class="act__row">' +
+                 '<textarea class="act__in" data-act="edit" data-b="' + bi + '" data-s="' + si + '" data-i="' + i + '" ' +
+                 'placeholder="이 단계에서 할 활동">' + esc(a.text || '') + '</textarea>' +
+                 '<input class="act__hr" type="number" min="0" max="20" data-act="hours" ' +
+                 'data-b="' + bi + '" data-s="' + si + '" data-i="' + i + '" ' +
+                 'value="' + (Number(a.hours) || 0) + '" aria-label="차시">' +
+                 '<button class="act__del" type="button" data-act="del" data-b="' + bi + '" data-s="' + si + '" data-i="' + i + '" ' +
+                 'aria-label="지우기">×</button></div>' +
+                 tagRow(bi, si, i, a) + '</div>';
+          });
+
+          h += '<button class="stage__add" type="button" data-act="add" data-b="' + bi + '" data-s="' + si + '">활동 추가</button></div>';
         });
 
-        h += '<button class="stage__add" type="button" data-act="add" data-s="' + esc(st.id) + '">활동 추가</button></div>';
+        // 이 묶음에 단계를 더 넣을 수 있게 한다
+        var have = {};
+        (b.stages || []).forEach(function (sl) { have[sl.id] = 1; });
+        var rest = m.stages.filter(function (st) { return !have[st.id]; });
+        if (rest.length) {
+          h += '<div class="blk__foot">';
+          if (addOpen[bi]) {
+            h += '<span class="act__label">더할 단계</span><div class="chips">';
+            rest.forEach(function (st) {
+              h += '<button class="minitag" type="button" data-act="addStage" data-b="' + bi + '" ' +
+                   'data-v="' + esc(st.id) + '">' + esc(st.ko) + '</button>';
+            });
+            h += '</div><button class="act__more" type="button" data-act="addOpen" data-b="' + bi + '">닫기</button>';
+          } else {
+            h += '<button class="stage__add" type="button" data-act="addOpen" data-b="' + bi + '">단계 더하기</button>';
+          }
+          h += '</div>';
+        }
+        h += '</div>';
       });
 
-      // 고른 것 가운데 어디에도 안 붙은 항목을 알려 준다
-      var used = { atl: {}, lp: {}, action: {} };
+      // 무엇이 어디에도 안 붙었는지
+      var used = { atl: {}, lp: {} };
       allActs().forEach(function (a) {
         (a.atl || []).forEach(function (x) { used.atl[x] = 1; });
         (a.lp || []).forEach(function (x) { used.lp[x] = 1; });
-        (a.action || []).forEach(function (x) { used.action[x] = 1; });
       });
-      h += '<div class="tally"><b>활동 ' + allActs().length + '개</b>';
+      h += '<div class="tally"><b>활동 ' + allActs().length + '개 · ' + totalHours() + '차시</b>';
       var kinds = [];
       if (!Object.keys(used.atl).length) kinds.push('ATL 기능');
       if (!Object.keys(used.lp).length) kinds.push('학습자상');
@@ -2909,67 +3038,77 @@
     /* ---- 생성 ---- */
     function buildPrompt() {
       var m = modelOf(state.inquiryModel);
-      var lines = (state.linesOfInquiry || [])
-        .filter(function (l) { return String(l.text || '').trim(); })
-        .map(function (l, i) { return (i + 1) + ') ' + l.text; }).join('\n');
-      var stages = m.stages.map(function (st, i) {
-        return (i + 1) + '. ' + st.id + ' (' + st.ko + '): ' + (st.goals || []).join(' / ');
-      }).join('\n');
+      var p = plan();
+      var lines = loi();
       var atl = atlList().map(function (x) { return x.id + '=' + x.ko; }).join(', ');
       var lp = lpList().map(function (x) { return x.id + '=' + x.ko; }).join(', ');
       var act = actList().map(function (x) { return x.id + '=' + x.ko; }).join(', ');
       var a = state.assessment || {};
 
-      var p = '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
-              '[학년] ' + state.grade + '학년\n' +
-              '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
-              '[탐구 목록]\n' + lines + '\n' +
-              (a.summative ? '[총괄평가] ' + String(a.summative).replace(/\n/g, ' ') + '\n' : '') + '\n' +
-              '[탐구 모델] ' + m.ko + ' — ' + m.source + '\n' +
-              '[단계와 목적]\n' + stages + '\n\n' +
-              '[할 일] 각 단계에 활동을 2~3개씩 배치한다.\n' +
-              '- 활동은 교실에서 실제로 할 수 있는 일로, 한 문장으로 쓴다.\n' +
-              '- 그 단계의 목적에 맞는 활동을 쓴다. 단계를 건너뛰거나 비우지 않는다.\n' +
-              '- 앞 단계에서 한 일이 뒷 단계로 이어지게 한다.\n' +
-              '- 총괄평가로 이어지는 흐름이 되게 한다.\n';
+      var shape = p.blocks.map(function (b, bi) {
+        var names = (b.stages || []).map(function (sl) {
+          var st = stageOf(m, sl.id);
+          return sl.id + '(' + (st ? st.ko : sl.id) + ')';
+        }).join(' → ');
+        return '  블록 ' + bi + ' [' + blockKo(b) + '] : ' + names;
+      }).join('\n');
 
-      // Murdoch 에는 일반화 단계가 없으므로 수렴 활동을 두 단계에 나눠 넣게 한다
+      var goals = m.stages.map(function (st) {
+        return '- ' + st.id + ' (' + st.ko + '): ' + (st.goals || []).join(' / ');
+      }).join('\n');
+
+      var p2 = '당신은 IB PYP 초학문적 탐구 단원을 설계하는 한국 초등학교 교사를 돕는다.\n\n' +
+               '[학년] ' + state.grade + '학년\n' +
+               '[중심 아이디어] ' + (state.centralIdea || '') + '\n' +
+               '[탐구 목록]\n' +
+               lines.map(function (l, i) { return (i + 1) + ') ' + l.text; }).join('\n') + '\n' +
+               (a.summative ? '[총괄평가] ' + String(a.summative).replace(/\n/g, ' ') + '\n' : '') + '\n' +
+               '[탐구 모델] ' + m.ko + ' — ' + m.source + '\n' +
+               '[단계별 목적]\n' + goals + '\n\n' +
+               '[이 단원의 짜임] 탐구 과정은 탐구 목록마다 되풀이된다. 아래 블록 구성을 그대로 따른다.\n' + shape + '\n\n' +
+               '[할 일] 각 블록의 각 단계에 활동을 1~3개씩 배치하고, 활동마다 차시를 정한다.\n' +
+               '- 단원 전체 차시 합계가 ' + p.targetHours + '차시가 되게 나눈다. 한 활동은 1~4차시로 잡는다.\n' +
+               '- 단원 열기는 한 번만 하고, 갈래마다 되풀이되는 블록에서는 그 갈래를 파고드는 활동을 쓴다.\n' +
+               '- 블록 [탐구 목록 n]의 활동은 그 갈래의 내용만 다룬다. 다른 갈래의 내용을 섞지 않는다.\n' +
+               '- 단원 닫기는 세 갈래에서 얻은 것을 모아 총괄평가로 이어지게 한다.\n' +
+               '- 활동은 교실에서 실제로 할 수 있는 일로, 한 문장으로 쓴다.\n';
+
       if (m.id === 'murdoch5') {
-        p += '- 이 모델에는 일반화하기가 독립 단계로 없다. ' +
-             '개념을 문장으로 모아 세우는 일반화 수렴 활동은 범주화하기(sortingOut)와 더 나아가기(goingFurther)에 나누어 넣는다. ' +
-             '범주화하기에서는 찾은 것을 견주어 관계를 문장으로 세우게 하고, ' +
-             '더 나아가기에서는 그 문장을 새 사례에 대어 보며 다듬게 한다.\n';
+        p2 += '- 이 모델에는 일반화하기가 독립 단계로 없다. ' +
+              '개념을 문장으로 모아 세우는 일반화 수렴 활동은 범주화하기(sortingOut)와 더 나아가기(goingFurther)에 나누어 넣는다. ' +
+              '범주화하기에서는 찾은 것을 견주어 관계를 문장으로 세우게 하고, ' +
+              '더 나아가기에서는 그 문장을 새 사례에 대어 보며 다듬게 한다.\n';
       } else {
-        p += '- 성찰하기(reflect)는 마지막에만 몰지 말고, 다른 단계의 활동 안에도 성찰이 스미도록 쓴다.\n';
+        p2 += '- 성찰하기(reflect)는 마지막에만 몰지 말고, 다른 단계의 활동 안에도 성찰이 스미도록 쓴다.\n';
       }
 
-      p += '\n활동마다 무엇을 기르는지 아래 목록의 영문 id로 표시한다.\n' +
-           '- atl (기르는 기능, 0~2개): ' + atl + '\n' +
-           '- lp (드러나는 학습자상, 0~2개): ' + lp + '\n' +
-           '- action (실행 유형, 0~1개. 실제 행동으로 이어지는 활동에만 붙인다): ' + act + '\n' +
-           '전부 채우려 애쓰지 않는다. 그 활동에서 실제로 길러지는 것만 붙인다.\n' +
-           '다만 단원 전체로 보아 ATL 다섯 범주 가운데 셋 이상, 학습자상 가운데 셋 이상이 어딘가에는 나오게 한다.\n\n' +
-           '공통 조건:\n' +
-           '- ' + state.grade + '학년 교실에서 할 수 있는 활동으로 쓴다.\n' +
-           '- 평서형으로 끝낸다. 존댓말 어미를 쓰지 않는다.\n' +
-           '- 고유명사와 특정 지명·인명을 넣지 않는다.\n\n' +
-           '[출력] 다음 형태의 JSON만 출력한다. stage 값은 위 단계의 영문 id를 그대로 쓴다.\n' +
-           '{ "stages": [ { "stage": "' + m.stages[0].id + '", "activities": [ ' +
-           '{ "text": "활동 한 문장", "atl": ["thinking"], "lp": ["inquirer"], "action": [] } ] } ] }';
-      return p;
+      p2 += '\n활동마다 무엇을 기르는지 아래 목록의 영문 id로 표시한다.\n' +
+            '- atl (기르는 기능, 0~2개): ' + atl + '\n' +
+            '- lp (드러나는 학습자상, 0~2개): ' + lp + '\n' +
+            '- action (실행 유형, 0~1개. 실제 행동으로 이어지는 활동에만 붙인다): ' + act + '\n' +
+            '전부 채우려 애쓰지 않는다. 그 활동에서 실제로 길러지는 것만 붙인다.\n' +
+            '다만 단원 전체로 보아 ATL 다섯 범주 가운데 셋 이상, 학습자상 가운데 셋 이상이 어딘가에는 나오게 한다.\n\n' +
+            '공통 조건:\n' +
+            '- ' + state.grade + '학년 교실에서 할 수 있는 활동으로 쓴다.\n' +
+            '- 평서형으로 끝낸다. 존댓말 어미를 쓰지 않는다.\n' +
+            '- 고유명사와 특정 지명·인명을 넣지 않는다.\n\n' +
+            '[출력] 다음 형태의 JSON만 출력한다. block은 위 블록 번호, stage는 그 블록에 적힌 영문 id를 그대로 쓴다.\n' +
+            '{ "items": [ { "block": 0, "stage": "' + p.blocks[0].stages[0].id + '", ' +
+            '"activities": [ { "text": "활동 한 문장", "hours": 2, "atl": ["thinking"], "lp": [], "action": [] } ] } ] }';
+      return p2;
     }
 
     function generate() {
       var m = modelOf(state.inquiryModel);
       if (!m) { msg('탐구 모델을 먼저 골라 주세요.', 'warn'); return; }
+      if (!loi().length) { msg('4단계에서 탐구 목록을 먼저 써 주세요.', 'warn'); return; }
+
       var btn = $('#s7-model [data-act="gen"]');
       if (btn) { btn.disabled = true; btn.textContent = '만드는 중…'; }
-      msg('탐구 흐름에 맞춰 활동을 배치하는 중입니다. 25초쯤 걸립니다.', 'info');
+      msg('탐구 목록마다 도는 흐름으로 활동과 차시를 나누는 중입니다. 30초쯤 걸립니다.', 'info');
 
       callGemini(buildPrompt()).then(function (res) {
-        var got = (res && res.stages) || [];
-        var okIds = {};
-        m.stages.forEach(function (st) { okIds[st.id] = 1; });
+        var p = plan();
         var atlOk = {}, lpOk = {}, actOk = {};
         atlList().forEach(function (x) { atlOk[x.id] = 1; });
         lpList().forEach(function (x) { lpOk[x.id] = 1; });
@@ -2979,28 +3118,36 @@
                             .filter(function (v) { return dict[v]; });
         };
 
-        var next = {};
-        m.stages.forEach(function (st) { next[st.id] = []; });
-        got.forEach(function (g) {
-          var sid = String((g && g.stage) || '').trim();
-          if (!okIds[sid]) return;
-          (g.activities || []).forEach(function (a) {
+        p.blocks.forEach(function (b) {
+          (b.stages || []).forEach(function (sl) { sl.acts = []; });
+        });
+
+        ((res && res.items) || []).forEach(function (it) {
+          var bi = Number(it && it.block);
+          var b = p.blocks[bi];
+          if (!b) return;
+          var sid = String((it && it.stage) || '').trim();
+          var sl = null;
+          (b.stages || []).forEach(function (x) { if (x.id === sid) sl = x; });
+          if (!sl) return;
+          (it.activities || []).forEach(function (a) {
             var t = String((a && a.text) || '').trim();
             if (!t) return;
-            next[sid].push({
+            var hr = Number(a.hours);
+            sl.acts.push({
               text: t,
+              hours: (isFinite(hr) && hr > 0) ? Math.min(Math.round(hr), 20) : 1,
               atl: keep(a.atl, atlOk),
               lp: keep(a.lp, lpOk),
               action: keep(a.action, actOk)
             });
           });
         });
-        state.inquiryStages = next;
-        open = {};
-        paintAll();
 
+        open = {}; addOpen = {};
+        paintAll();
         var n = allActs().length;
-        msg(n ? '활동 ' + n + '개를 배치했습니다. 우리 반 사정에 맞게 고쳐 쓰고 태그를 확인해 주세요.'
+        msg(n ? '활동 ' + n + '개를 배치했습니다(모두 ' + totalHours() + '차시). 우리 반 사정에 맞게 고쳐 주세요.'
               : '활동을 배치하지 못했습니다. 다시 눌러 주세요.', n ? 'info' : 'warn');
       })['catch'](function (e) {
         paintAll();
@@ -3013,35 +3160,115 @@
       if (state.inquiryModel === id) return;
       // 두 모델은 단계 구성이 달라 활동을 옮길 수 없다.
       state.inquiryModel = id;
-      state.inquiryStages = {};
-      open = {};
+      state.inquiryPlan = freshPlan(id);
+      open = {}; addOpen = {};
       paintAll();
     }
-    function addAct(sid) {
-      acts(sid).push({ text: '', atl: [], lp: [], action: [] });
+    function resetPlan() {
+      if (!state.inquiryModel) return;
+      state.inquiryPlan = freshPlan(state.inquiryModel);
+      open = {}; addOpen = {};
       paintAll();
-      var boxes = $$('#s7-stages [data-act="edit"][data-s="' + sid + '"]');
+      msg('기본 틀로 되돌렸습니다.', 'info');
+    }
+    function slotAt(bi, si) {
+      var p = plan();
+      var b = p && p.blocks[bi];
+      return (b && b.stages[si]) || null;
+    }
+    function addAct(bi, si) {
+      var sl = slotAt(bi, si);
+      if (!sl) return;
+      sl.acts.push({ text: '', hours: 1, atl: [], lp: [], action: [] });
+      paintAll();
+      var boxes = $$('#s7-stages [data-act="edit"][data-b="' + bi + '"][data-s="' + si + '"]');
       if (boxes.length) boxes[boxes.length - 1].focus();
     }
-    function delAct(sid, i) {
-      var arr = acts(sid);
-      if (i < 0 || i >= arr.length) return;
-      arr.splice(i, 1);
+    function delAct(bi, si, i) {
+      var sl = slotAt(bi, si);
+      if (!sl || i < 0 || i >= sl.acts.length) return;
+      sl.acts.splice(i, 1);
       open = {};
       paintAll();
     }
-    function toggleTag(g, sid, i, v) {
-      var a = acts(sid)[i];
+    function toggleTag(g, bi, si, i, v) {
+      var sl = slotAt(bi, si);
+      var a = sl && sl.acts[i];
       if (!a) return;
       if (!Array.isArray(a[g])) a[g] = [];
       var at = a[g].indexOf(v);
       if (at >= 0) a[g].splice(at, 1); else a[g].push(v);
       paintAll();
     }
-    function toggleMore(sid, i) {
-      var key = sid + ':' + i;
+    function toggleMore(bi, si, i) {
+      var key = bi + ':' + si + ':' + i;
       if (open[key]) delete open[key]; else open[key] = 1;
       paintAll();
+    }
+    function toggleAddOpen(bi) {
+      if (addOpen[bi]) delete addOpen[bi]; else addOpen[bi] = 1;
+      paintAll();
+    }
+    function addStage(bi, sid) {
+      var p = plan();
+      var b = p && p.blocks[bi];
+      if (!b) return;
+      var dup = (b.stages || []).some(function (x) { return x.id === sid; });
+      if (dup) return;
+      b.stages.push({ id: sid, acts: [] });
+      delete addOpen[bi];
+      paintAll();
+    }
+    function dropStage(bi, si) {
+      var p = plan();
+      var b = p && p.blocks[bi];
+      if (!b || !b.stages[si]) return;
+      b.stages.splice(si, 1);
+      open = {};
+      paintAll();
+    }
+    function setTarget(v) {
+      var p = plan();
+      if (!p) return;
+      var num = Math.max(1, Math.min(200, Math.round(Number(v) || 0)));
+      p.targetHours = num;
+      saveDraft();
+      // 목표만 바뀌었으므로 위쪽 숫자만 고쳐 입력 중인 칸을 건드리지 않는다
+      var total = totalHours();
+      var left = num - total;
+      var gap = $('#s7-model .hours__gap');
+      if (gap) {
+        gap.setAttribute('data-t', left === 0 ? 'ok' : (left > 0 ? 'less' : 'over'));
+        gap.textContent = left === 0 ? '딱 맞습니다' : (left > 0 ? left + '차시 남음' : (-left) + '차시 초과');
+      }
+    }
+    function setHours(bi, si, i, v) {
+      var sl = slotAt(bi, si);
+      var a = sl && sl.acts[i];
+      if (!a) return;
+      a.hours = Math.max(0, Math.min(20, Math.round(Number(v) || 0)));
+      saveDraft();
+      refreshHours();
+    }
+    /** 차시 숫자만 다시 계산한다. 입력 중인 칸을 다시 그리지 않는다. */
+    function refreshHours() {
+      var p = plan();
+      if (!p) return;
+      $$('#s7-stages .blk').forEach(function (el, bi) {
+        var lab = $('.blk__hours', el);
+        if (lab && p.blocks[bi]) lab.textContent = blockHours(p.blocks[bi]) + '차시';
+      });
+      var total = totalHours();
+      var now = $('#s7-model .hours__now b');
+      if (now) now.textContent = total;
+      var left = p.targetHours - total;
+      var gap = $('#s7-model .hours__gap');
+      if (gap) {
+        gap.setAttribute('data-t', left === 0 ? 'ok' : (left > 0 ? 'less' : 'over'));
+        gap.textContent = left === 0 ? '딱 맞습니다' : (left > 0 ? left + '차시 남음' : (-left) + '차시 초과');
+      }
+      var tally = $('#s7-stages .tally b');
+      if (tally) tally.textContent = '활동 ' + allActs().length + '개 · ' + total + '차시';
     }
 
     function bindStep7() {
@@ -3050,24 +3277,37 @@
         var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
         if (!el || !root.contains(el)) return;
         var act = el.getAttribute('data-act');
-        var sid = el.getAttribute('data-s');
+        var bi = Number(el.getAttribute('data-b'));
+        var si = Number(el.getAttribute('data-s'));
         var i = Number(el.getAttribute('data-i'));
         if (act === 'model') pickModel(el.getAttribute('data-v'));
         if (act === 'gen') generate();
-        if (act === 'add') addAct(sid);
-        if (act === 'del') delAct(sid, i);
-        if (act === 'more') toggleMore(sid, i);
+        if (act === 'reset') resetPlan();
+        if (act === 'add') addAct(bi, si);
+        if (act === 'del') delAct(bi, si, i);
+        if (act === 'more') toggleMore(bi, si, i);
+        if (act === 'addOpen') toggleAddOpen(bi);
+        if (act === 'addStage') addStage(bi, el.getAttribute('data-v'));
+        if (act === 'dropStage') dropStage(bi, si);
         if (act === 'tag' || act === 'untag') {
-          toggleTag(el.getAttribute('data-g'), sid, i, el.getAttribute('data-v'));
+          toggleTag(el.getAttribute('data-g'), bi, si, i, el.getAttribute('data-v'));
         }
       });
       root.addEventListener('input', function (ev) {
         var t = ev.target;
-        if (!t || !t.matches || !t.matches('[data-act="edit"]')) return;
-        var a = acts(t.getAttribute('data-s'))[Number(t.getAttribute('data-i'))];
-        if (a) { a.text = t.value; saveDraft(); }
-        t.style.height = 'auto';
-        t.style.height = (t.scrollHeight + 2) + 'px';
+        if (!t || !t.matches) return;
+        if (t.matches('[data-act="edit"]')) {
+          var sl = slotAt(Number(t.getAttribute('data-b')), Number(t.getAttribute('data-s')));
+          var a = sl && sl.acts[Number(t.getAttribute('data-i'))];
+          if (a) { a.text = t.value; saveDraft(); }
+          t.style.height = 'auto';
+          t.style.height = (t.scrollHeight + 2) + 'px';
+        } else if (t.matches('[data-act="hours"]')) {
+          setHours(Number(t.getAttribute('data-b')), Number(t.getAttribute('data-s')),
+                   Number(t.getAttribute('data-i')), t.value);
+        } else if (t.matches('[data-act="target"]')) {
+          setTarget(t.value);
+        }
       });
     }
 
@@ -3076,30 +3316,45 @@
       var m = modelOf(st.inquiryModel);
       if (!m) { hard.push('탐구 모델을 골라 주세요.'); return { hard: hard, soft: soft }; }
 
-      var b = (st.inquiryStages && !Array.isArray(st.inquiryStages)) ? st.inquiryStages : {};
-      var filled = function (sid) {
-        return (b[sid] || []).filter(function (a) { return String(a.text || '').trim(); });
+      var p = st.inquiryPlan;
+      if (!p || !Array.isArray(p.blocks)) { hard.push('탐구 단계에 활동을 하나 이상 써 주세요.'); return { hard: hard, soft: soft }; }
+
+      var filled = function (sl) {
+        return (sl.acts || []).filter(function (a) { return String(a.text || '').trim(); });
       };
-      var total = 0;
-      m.stages.forEach(function (s2) { total += filled(s2.id).length; });
+      var total = 0, hours = 0, emptyBlocks = [];
+      p.blocks.forEach(function (b) {
+        var cnt = 0;
+        (b.stages || []).forEach(function (sl) {
+          var list = filled(sl);
+          cnt += list.length;
+          list.forEach(function (a) { hours += Number(a.hours) || 0; });
+        });
+        total += cnt;
+        if (!cnt) emptyBlocks.push(blockKo(b).split(' — ')[0]);
+      });
       if (!total) hard.push('탐구 단계에 활동을 하나 이상 써 주세요.');
 
       if (!hard.length) {
-        var empty = [];
-        m.stages.forEach(function (s2) { if (!filled(s2.id).length) empty.push(s2.ko); });
-        if (empty.length) soft.push(empty.join(' · ') + ' 단계가 비어 있습니다.');
+        if (emptyBlocks.length) soft.push(emptyBlocks.join(' · ') + ' 묶음이 비어 있습니다.');
 
-        var used = { atl: {}, lp: {} }, noTag = 0;
-        m.stages.forEach(function (s2) {
-          filled(s2.id).forEach(function (a) {
-            (a.atl || []).forEach(function (x) { used.atl[x] = 1; });
-            (a.lp || []).forEach(function (x) { used.lp[x] = 1; });
-            if (!(a.atl || []).length && !(a.lp || []).length) noTag++;
+        var gap = (p.targetHours || 0) - hours;
+        if (Math.abs(gap) >= HOUR_TOLERANCE) {
+          soft.push('목표 ' + p.targetHours + '차시인데 ' + hours + '차시가 배치되어 있습니다(' +
+                    (gap > 0 ? gap + '차시 모자람' : (-gap) + '차시 초과') + ').');
+        }
+
+        var used = { atl: {}, lp: {} };
+        p.blocks.forEach(function (b) {
+          (b.stages || []).forEach(function (sl) {
+            filled(sl).forEach(function (a) {
+              (a.atl || []).forEach(function (x) { used.atl[x] = 1; });
+              (a.lp || []).forEach(function (x) { used.lp[x] = 1; });
+            });
           });
         });
         if (!Object.keys(used.atl).length) soft.push('ATL 기능 태그가 어느 활동에도 없습니다.');
         if (!Object.keys(used.lp).length) soft.push('학습자상 태그가 어느 활동에도 없습니다.');
-        if (noTag && noTag === total) soft.push('활동에 태그가 하나도 붙어 있지 않습니다.');
       }
       return { hard: hard, soft: soft };
     });

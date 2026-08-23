@@ -771,10 +771,82 @@ html[data-theme="dark"] .model__cnt{color:var(--pine)}
 .model__src{display:block;font-size:12.5px;color:var(--ink-3);margin-bottom:5px}
 .model__note{display:block;font-size:13.5px;color:var(--ink-2);line-height:1.5}
 
+/* 묶음: 단원 열기 · 탐구 목록별 반복 · 단원 닫기 */
+.blk{
+  border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--paper);
+  padding:13px 14px;margin-bottom:14px;
+}
+.blk[data-kind="loop"]{
+  border-left:3px solid var(--pine);
+}
+.blk[data-kind="intro"],.blk[data-kind="outro"]{
+  border-left:3px solid var(--line);
+}
+.blk__head{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:11px}
+.blk__ko{font-size:15px;font-weight:700}
+.blk__hours{
+  margin-left:auto;flex:none;
+  font-size:12.5px;font-weight:700;line-height:1.7;
+  padding:0 9px;border-radius:99px;
+  border:1px solid var(--line);color:var(--ink-3);
+  font-variant-numeric:tabular-nums;
+}
+.blk__foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+/* 목표 차시 줄 */
+.hours{
+  display:flex;flex-wrap:wrap;gap:11px;align-items:center;
+  padding:12px 15px;margin-bottom:12px;
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+}
+.hours__key{font-size:14px;font-weight:700}
+.hours__in{
+  width:78px;height:36px;padding:0 10px;
+  background:var(--paper);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-size:15px;font-weight:700;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+.hours__in:focus{outline:2px solid var(--pine);border-color:var(--pine)}
+.hours__now{font-size:14px;color:var(--ink-3)}
+.hours__now b{color:var(--ink);font-variant-numeric:tabular-nums}
+.hours__gap{
+  font-size:12.5px;font-weight:700;padding:2px 10px;border-radius:99px;
+  border:1px solid var(--line);color:var(--ink-3);
+}
+.hours__gap[data-t="ok"]{
+  border-color:color-mix(in srgb,var(--pine) 45%,transparent);
+  background:var(--pine-wash);color:var(--pine-ink);
+}
+.hours__gap[data-t="less"]{
+  border-color:color-mix(in srgb,var(--warn) 45%,transparent);
+  background:var(--warn-wash);color:var(--warn);
+}
+.hours__gap[data-t="over"]{
+  border-color:color-mix(in srgb,var(--alert) 45%,transparent);
+  background:var(--alert-wash);color:var(--alert);
+}
+
+.stage__drop{
+  margin-left:auto;background:none;border:0;cursor:pointer;
+  color:var(--ink-3);font-size:12.5px;font-weight:600;padding:3px 7px;border-radius:5px;
+}
+.stage__drop:hover{color:var(--alert);background:var(--alert-wash)}
+.act__hr{
+  flex:none;width:56px;height:38px;padding:0 8px;
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-size:14px;font-weight:700;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+.act__hr:focus{outline:2px solid var(--pine);border-color:var(--pine)}
+
 .stage{
   background:var(--surface);
   border:1px solid var(--line);border-radius:var(--radius);
-  padding:15px 17px;margin-bottom:11px;
+  padding:13px 15px;margin-bottom:9px;
 }
 .stage__head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:5px}
 .stage__ord{
