@@ -1059,6 +1059,50 @@ html[data-theme="dark"] .vitem__go{color:var(--pine)}
 }
 .moment__text{font-size:14px;color:var(--ink-2);line-height:1.55}
 
+/* ---- 설계안 문서: 미리보기와 인쇄가 같은 것을 쓴다 ---- */
+#paper{display:none}
+#paper[data-open="true"]{display:block}
+.doc{
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px 28px;margin-top:12px;
+  font-size:14.5px;line-height:1.6;
+}
+.doc__title{
+  font-family:var(--font-display);
+  font-size:22px;letter-spacing:-.01em;
+  margin-bottom:4px;
+}
+.doc__sub{font-size:13px;color:var(--ink-3);margin-bottom:20px}
+.doc h4{
+  font-size:15.5px;font-weight:700;
+  margin:22px 0 9px;padding-bottom:5px;
+  border-bottom:2px solid var(--line);
+}
+.doc h4:first-of-type{margin-top:0}
+.doc h5{font-size:14px;font-weight:700;margin:14px 0 6px;color:var(--ink-2)}
+.doc table{width:100%;border-collapse:collapse;margin-bottom:10px}
+.doc th,.doc td{
+  border:1px solid var(--line);
+  padding:7px 10px;text-align:left;vertical-align:top;
+  font-size:14px;line-height:1.55;
+}
+.doc th{
+  background:var(--line-2);font-weight:700;
+  width:132px;white-space:nowrap;
+}
+.doc thead th{width:auto;text-align:left}
+.doc td ul{margin:0;padding-left:16px}
+.doc td li{margin-bottom:2px}
+.doc__note{font-size:12.5px;color:var(--ink-3);line-height:1.5;margin:-4px 0 9px}
+.doc__foot{
+  margin-top:22px;padding-top:12px;
+  border-top:1px solid var(--line);
+  font-size:12px;color:var(--ink-3);line-height:1.55;
+}
+.doc__empty{color:var(--ink-3)}
+.doc__code{font-weight:700;white-space:nowrap}
+
 /* ============================================================
    반응형
    ============================================================ */
@@ -1097,24 +1141,30 @@ html[data-theme="dark"] .vitem__go{color:var(--pine)}
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
 }
 @media print{
-  /* 여덟 단계를 한 문서처럼 이어 붙여 찍는다. 조작용 요소는 감춘다. */
-  .appbar,.rail,.stepnav,.foot__badge,
-  .btn,.rowbtns,.act__del,.qrow__del,.loi__del,.stage__drop,.stage__add,
-  .act__more,.picker,.qadd,.blk__foot,.vitem__go,.notice,
-  #s8-check,#s8-out{display:none !important}
+  /* 화면을 그대로 찍지 않는다. 고른 것만 정리한 설계안 문서 하나만 찍는다. */
+  .appbar,.rail,.stepnav,.foot,.shell > .main > .step,
+  #s8-check,#s8-ctx,#s8-out{display:none !important}
   .shell{display:block;padding:0;max-width:none}
-  .step{display:block !important;page-break-after:always;animation:none}
-  .step:last-of-type{page-break-after:auto}
-  .step__title{font-size:20px}
-  body{background:#fff;color:#000;font-size:11pt}
-  .card,.asm,.stage,.blk,.act,.qloi,.loi,.crit__cell,.group,.anchor,.sum{
-    background:#fff;border-color:#bbb;box-shadow:none;
+  body{background:#fff;color:#000;font-size:10.5pt}
+
+  #paper{display:block !important}
+  .doc{
+    background:#fff;border:0;border-radius:0;
+    padding:0;margin:0;font-size:10.5pt;line-height:1.55;
   }
-  textarea,input{
-    background:#fff !important;color:#000 !important;border-color:#bbb !important;
-    resize:none;overflow:visible;
+  .doc__title{font-size:17pt}
+  .doc h4{
+    font-size:12pt;margin:16px 0 7px;
+    border-bottom:1.5pt solid #333;
+    page-break-after:avoid;
   }
-  .minitag,.chip,.tagbtn,.rc,.qrow__type,.tag{border-color:#999}
+  .doc h5{font-size:10.5pt;page-break-after:avoid}
+  .doc table{page-break-inside:auto}
+  .doc tr{page-break-inside:avoid}
+  .doc th,.doc td{border:0.5pt solid #999;padding:4pt 6pt;font-size:9.5pt}
+  .doc th{background:#f0f0f0}
+  .doc__note,.doc__foot{color:#555}
+  @page{margin:15mm 14mm}
 }
 </style>
 </head>
@@ -1291,6 +1341,7 @@ html[data-theme="dark"] .vitem__go{color:var(--pine)}
       <p class="stepnav__status" id="stepnav-status">8단계 가운데 1단계입니다.</p>
     </div>
 
+    <div id="paper" data-open="false" aria-hidden="true"></div>
   </main>
 </div>
 

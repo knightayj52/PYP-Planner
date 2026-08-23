@@ -3793,7 +3793,11 @@
            '<button class="btn btn--primary btn--lg" type="button" data-act="docx"' +
            (stops.length ? ' disabled' : '') + '>워드로 내려받기</button>' +
            '<button class="btn btn--lg" type="button" data-act="print">인쇄 · PDF로 저장</button>' +
-           '</div>';
+           '<button class="btn btn--lg" type="button" data-act="preview">' +
+           (previewOpen ? '미리보기 닫기' : '미리보기') + '</button>' +
+           '</div>' +
+           '<p class="block__hint" style="margin:2px 0 0">' +
+           '워드와 인쇄 모두 아래 미리보기와 같은 내용으로 나갑니다. 화면 전체가 아니라 고르신 것만 담깁니다.</p>';
       if (stops.length) {
         h += '<p class="notice notice--warn" style="margin-top:10px">' +
              '반드시 채울 곳 ' + stops.length + '군데를 먼저 채워 주세요. 인쇄는 지금도 됩니다.</p>';
@@ -3813,6 +3817,11 @@
     function paintAll() {
       if (!fw) return;
       paintCheck(); paintCtx(); paintOut();
+      var box = $('#paper');
+      if (box) {
+        box.setAttribute('data-open', previewOpen ? 'true' : 'false');
+        if (previewOpen) renderPaper();
+      }
       saveDraft();
     }
 
@@ -3945,6 +3954,178 @@
         })(),
         connections: { priorThemes: t(c.priorThemes), otherSubjects: t(c.otherSubjects), localGlobal: t(c.localGlobal) }
       };
+    }
+
+    /* ---- 설계안 문서 그리기 ----
+     * 화면을 그대로 찍으면 고르지 않은 것까지 다 나온다.
+     * 워드와 같은 자료(payload)로 문서를 하나 만들어 미리보기와 인쇄가 함께 쓴다.
+     */
+    function docHtml(p) {
+      var e = esc;
+      var h = '<div class="doc">';
+      h += '<p class="doc__title">' + e(p.title) + ' 탐구 단원(UOI) 설계안</p>' +
+           '<p class="doc__sub">성취기준과 연계한 초학문적 탐구 단원 설계</p>';
+
+      var kv = function (rows) {
+        var out = '<table><tbody>';
+        rows.forEach(function (r) {
+          if (r[1] === false) return;                       // 아예 빼는 줄
+          out += '<tr><th>' + e(r[0]) + '</th><td>' +
+                 (r[1] ? r[1] : '<span class="doc__empty">—</span>') + '</td></tr>';
+        });
+        return out + '</tbody></table>';
+      };
+      var list = function (arr) {
+        if (!arr || !arr.length) return '';
+        return '<ul>' + arr.map(function (x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ul>';
+      };
+
+      /* 1. 개요 */
+      h += '<h4>1. 단원 개요</h4>';
+      h += kv([
+        ['학년', e(p.grade ? p.grade + '학년' : '')],
+        ['교과', e(p.subjects.join(', ') + (p.unit ? '  (통합교과 단원: ' + p.unit + ')' : ''))],
+        ['초학문적 주제', e(p.theme)],
+        ['중심 아이디어', e(p.centralIdea)],
+        ['명시된 개념', e(p.keyConcepts.join(' · '))],
+        ['기타 개념', e(p.relatedConcepts.join(', '))],
+        ['탐구 모델', e(p.model + (p.modelSource ? '  (' + p.modelSource + ')' : ''))],
+        ['운영 차시', e(p.targetHours ? p.targetHours + '차시' : '')]
+      ]);
+
+      /* 2. 성취기준 */
+      h += '<h4>2. 관련 성취기준</h4>';
+      if (p.standards.length) {
+        h += '<table><thead><tr><th>코드</th><th>교과</th><th>성취기준</th></tr></thead><tbody>';
+        p.standards.forEach(function (x) {
+          h += '<tr><td class="doc__code">' + e(x.code) + '</td><td>' + e(x.subject) +
+               '</td><td>' + e(x.text) + '</td></tr>';
+        });
+        h += '</tbody></table>';
+      } else {
+        h += '<p class="doc__empty">고른 성취기준이 없습니다.</p>';
+      }
+
+      /* 3. 탐구 목록과 질문 */
+      h += '<h4>3. 탐구 목록과 질문</h4>';
+      if (!p.lines.length) h += '<p class="doc__empty">탐구 목록이 없습니다.</p>';
+      p.lines.forEach(function (l, i) {
+        h += '<h5>' + (i + 1) + '. ' + e(l.text) +
+             (l.concepts.length ? '  [' + e(l.concepts.join(' · ')) + ']' : '') + '</h5>';
+        var byType = {};
+        l.teacher.forEach(function (q) {
+          if (!byType[q.type]) byType[q.type] = [];
+          byType[q.type].push(q.text);
+        });
+        var rows = [];
+        ['사실', '형성', '개념', '논쟁'].forEach(function (k) {
+          if (byType[k]) rows.push([k + ' 질문', list(byType[k])]);
+        });
+        if (l.student.length) {
+          rows.push(['예상 학생 질문', list(l.student.map(function (q) { return q.text; }))]);
+        }
+        if (l.formative) rows.push(['형성평가', e(l.formative)]);
+        h += rows.length ? kv(rows) : '<p class="doc__empty">이 갈래에 적힌 질문이 없습니다.</p>';
+      });
+
+      /* 4. 평가 */
+      h += '<h4>4. 평가</h4>';
+      h += kv([['진단평가', e(p.assessment.diagnostic)], ['총괄평가', e(p.assessment.summative).replace(/\n/g, '<br>')]]);
+      if (p.assessment.frame) {
+        var FR = {
+          grasps: [['goal', '목표'], ['role', '역할'], ['audience', '청중'],
+                   ['situation', '상황'], ['product', '산출물'], ['standards', '기준']],
+          rafts: [['role', '역할'], ['audience', '청중'], ['format', '형식'],
+                  ['topic', '주제'], ['strong', '강한 동사']]
+        }[p.assessment.frame];
+        var fd = p.assessment.frameData || {};
+        var frows = FR.filter(function (x) { return String(fd[x[0]] || '').trim(); })
+                      .map(function (x) { return [x[1], e(fd[x[0]])]; });
+        if (frows.length) {
+          h += '<h5>총괄평가 ' + (p.assessment.frame === 'grasps' ? 'GRASPS' : 'RAFTS') + '</h5>' + kv(frows);
+        }
+      }
+      h += '<h5>도달 기준</h5>' + kv([
+        ['지식', e(p.assessment.criteria.knowledge || '')],
+        ['이해', e(p.assessment.criteria.understanding || '')],
+        ['기능', e(p.assessment.criteria.skills || '')]
+      ]);
+
+      /* 5. 탐구 과정 */
+      h += '<h4>5. 탐구 과정</h4>';
+      if (!p.blocks.length) h += '<p class="doc__empty">배치한 활동이 없습니다.</p>';
+      p.blocks.forEach(function (b) {
+        h += '<h5>' + e(b.ko) + '</h5>' +
+             '<table><thead><tr><th style="width:110px">단계</th><th>활동</th>' +
+             '<th style="width:56px">차시</th><th style="width:150px">기르는 것</th></tr></thead><tbody>';
+        b.stages.forEach(function (st) {
+          st.acts.forEach(function (a, i) {
+            h += '<tr><td>' + (i === 0 ? e(st.ko) : '') + '</td><td>' + e(a.text) + '</td>' +
+                 '<td>' + (a.hours ? a.hours + '차시' : '') + '</td>' +
+                 '<td>' + e(a.tags.join(' · ')) + '</td></tr>';
+          });
+        });
+        h += '</tbody></table>';
+      });
+
+      /* 6. 실행 */
+      var sec = 6;
+      if (p.action && p.action.groups.length) {
+        h += '<h4>6. 실행</h4>' +
+             '<p class="doc__note">실행은 학생이 스스로 정하는 일이며 차시에 넣지 않는다. ' +
+             '아래는 나올 만한 일을 미리 그려 둔 것이다.</p>';
+        var arows = p.action.groups.filter(function (g) { return g.ideas.length; })
+                     .map(function (g) { return [g.ko, list(g.ideas)]; });
+        h += arows.length ? kv(arows) : '<p class="doc__empty">적어 둔 실행 예시가 없습니다.</p>';
+        if (p.action.moments.length) {
+          h += '<h5>실행 이야기가 나올 만한 자리</h5>' +
+               kv(p.action.moments.map(function (m2) { return [m2.where || '—', e(m2.text)]; }));
+        }
+        sec = 7;
+      }
+
+      /* 7. 연결되는 맥락 */
+      var cn = p.connections;
+      if (cn.priorThemes || cn.otherSubjects || cn.localGlobal) {
+        h += '<h4>' + sec + '. 연결되는 맥락</h4>' + kv([
+          ['과거 주제 학습과의 연결', e(cn.priorThemes)],
+          ['다른 교과와의 연결', e(cn.otherSubjects)],
+          ['지역·글로벌 과제와의 연결', e(cn.localGlobal)]
+        ]);
+      }
+
+      h += '<p class="doc__foot">이 설계안은 PYP 탐구 단원 설계 도우미로 만들었습니다. ' +
+           'IBO의 검토나 승인을 받은 도구가 아니며, 공식 기준은 학교의 IB 문서를 따릅니다. ' +
+           'ⓒ 영쌤클래스 · CC BY-NC 4.0</p>';
+      return h + '</div>';
+    }
+
+    /** 문서를 다시 그린다. 미리보기와 인쇄가 같은 것을 본다. */
+    function renderPaper() {
+      var box = $('#paper');
+      if (!box) return;
+      box.innerHTML = docHtml(payload());
+    }
+
+    var previewOpen = false;
+
+    function togglePreview() {
+      previewOpen = !previewOpen;
+      renderPaper();
+      var box = $('#paper');
+      box.setAttribute('data-open', previewOpen ? 'true' : 'false');
+      box.setAttribute('aria-hidden', previewOpen ? 'false' : 'true');
+      var btn = $('#s8-out [data-act="preview"]');
+      if (btn) btn.textContent = previewOpen ? '미리보기 닫기' : '미리보기';
+      if (previewOpen && box.scrollIntoView) {
+        try { box.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        catch (e) { box.scrollIntoView(true); }
+      }
+    }
+
+    function doPrint() {
+      renderPaper();   // 인쇄 직전에 최신 내용으로 맞춘다
+      window.print();
     }
 
     /* ---- 워드 내보내기 ---- */
@@ -4227,7 +4408,8 @@
         if (act === 'go') goStep(Number(el.getAttribute('data-v')));
         if (act === 'ctx') askCtx();
         if (act === 'docx') exportDocxFile();
-        if (act === 'print') window.print();
+        if (act === 'print') doPrint();
+        if (act === 'preview') togglePreview();
       });
       root.addEventListener('input', function (ev) {
         var t2 = ev.target;
