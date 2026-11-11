@@ -1166,6 +1166,21 @@ html[data-theme="dark"] .vitem__go{color:var(--pine)}
   .doc__note,.doc__foot{color:#555}
   @page{margin:15mm 14mm}
 }
+
+/* 숨김 처리한 알림 칸이 빈 상자로 보이지 않게 한다 */
+.notice[hidden]{display:none}
+/* 예시 체험 안내 띠 */
+.demo-bar{display:flex;align-items:center;gap:14px 20px;flex-wrap:wrap;margin:14px auto 0;padding:14px 18px;max-width:1180px;width:calc(100% - 28px);border:1px solid color-mix(in srgb,var(--pine) 30%,transparent);border-radius:14px;background:var(--pine-wash);color:var(--pine-ink)}
+.demo-bar__text{flex:1 1 320px;display:flex;flex-direction:column;gap:2px;font-size:14px;line-height:1.55}
+.demo-bar__text strong{font-size:15px}
+.demo-bar__btns{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:900px){
+  .demo-bar{margin-top:10px;padding:12px 14px}
+  .demo-bar__text{font-size:13.5px}
+  /* 좁은 화면에서 진행 레일이 페이지를 옆으로 밀지 않게 한다 */
+  .shell>*{min-width:0}
+}
+@media print{.demo-bar{display:none}}
 </style>
 </head>
 <body>
@@ -1417,6 +1432,8 @@ html[data-theme="dark"] .vitem__go{color:var(--pine)}
 </dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.js"></script>
+<script src="demo-state.js"></script>
+<script src="demo.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -24,7 +24,8 @@
   var KEYS = {
     apiKey: 'pyp.apiKey',
     theme: 'pyp.theme',
-    draft: 'pyp.draft',
+    // 예시 체험 중에는 임시 저장 칸을 따로 써서, 작업하던 설계안을 건드리지 않는다.
+    draft: (window.PYP_DEMO && window.PYP_DEMO.active) ? window.PYP_DEMO.draftKey : 'pyp.draft',
     vault: 'pyp.vault'
   };
 
@@ -452,6 +453,8 @@
 
   /** 생성 요청 입구. 형식이 어긋나면 같은 요청을 딱 한 번 다시 보낸다. */
   function callGemini(prompt, schema) {
+    // 예시 체험: Gemini를 부르지 않고 미리 준비한 예시 결과를 돌려준다.
+    if (window.PYP_DEMO && window.PYP_DEMO.active) return window.PYP_DEMO.respond(prompt, state);
     return callLadder(prompt, schema)['catch'](function (e) {
       if (isParseFail(e)) return callLadder(prompt, schema);
       throw e;
